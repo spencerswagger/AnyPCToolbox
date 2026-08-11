@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnyPCToolbox - 架构设计</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+    background: #f1f5f9; color: #1e293b; padding: 40px 24px; line-height: 1.6;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { font-size: 15px; color: #64748b; margin-bottom: 32px; }
+  .section { margin-bottom: 36px; }
+  h3 { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+  .platform-row { display: flex; gap: 20px; }
+  .platform-card {
+    flex: 1; background: #fff; border-radius: 14px; padding: 24px; border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .platform-card h4 {
+    font-size: 15px; font-weight: 600; margin-bottom: 12px; padding-bottom: 10px;
+    border-bottom: 2px solid; display: flex; align-items: center; gap: 8px;
+  }
+  .platform-card.desktop h4 { color: #2563eb; border-color: #dbeafe; }
+  .platform-card.web h4 { color: #059669; border-color: #d1fae5; }
+  .layer {
+    border-radius: 10px; padding: 14px; margin-bottom: 10px;
+  }
+  .layer .name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .layer .desc { font-size: 12px; opacity: 0.7; }
+  .layer.backend { background: #dbeafe; color: #1e40af; }
+  .layer.webview { background: #e0e7ff; color: #3730a3; }
+  .layer.webview.linux { background: #ede9fe; color: #5b21b6; }
+  .layer.frontend { background: #eef2ff; color: #312e81; }
+  .layer.web-frontend { background: #d1fae5; color: #065f46; }
+  .layer.web-static { background: #ecfdf5; color: #064e3b; }
+  .arrow { text-align: center; font-size: 12px; color: #94a3b8; margin: -2px 0; }
+  .code-block {
+    background: #1e293b; color: #e2e8f0; border-radius: 10px; padding: 20px 24px;
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; font-size: 13px; line-height: 1.8;
+    overflow-x: auto;
+  }
+  .code-block .comment { color: #64748b; }
+  .code-block .highlight { color: #38bdf8; }
+  .code-block .keyword { color: #c084fc; }
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .feature-item {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .feature-item .icon { font-size: 18px; flex-shrink: 0; }
+  .feature-item .label { font-size: 13px; font-weight: 600; }
+  .feature-item .desc { font-size: 12px; color: #64748b; }
+  @media (max-width: 640px) {
+    .platform-row { flex-direction: column; }
+    .feature-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧰 AnyPCToolbox — 架构设计</h1>
+  <p class="subtitle">Tauri 2.x + Vite + Vue3 + shadcn/ui · 一套代码覆盖桌面端和 Web</p>
+
+  <div class="section">
+    <h3>系统架构</h3>
+    <div class="platform-row">
+      <div class="platform-card desktop">
+        <h4>🖥️ 桌面端 (Tauri)</h4>
+        <div class="layer backend">
+          <div class="name">Rust 后端 (src-tauri/)</div>
+          <div class="desc">文件系统 · 系统 API · 原生窗口管理</div>
+        </div>
+        <div class="arrow">⬇ 系统 WebView 渲染</div>
+        <div class="layer webview">
+          <div class="name">WebView (macOS: WKWebView / Win: WebView2 / Linux: WebKitGTK)</div>
+          <div class="desc">操作系统原生 WebView，不捆绑 Chromium</div>
+        </div>
+        <div class="arrow">⬇ 渲染 HTML/CSS</div>
+        <div class="layer frontend">
+          <div class="name">Vue3 前端 (Vite 构建产物)</div>
+          <div class="desc">shadcn/ui · 离线运行 · 本地依赖</div>
+        </div>
+      </div>
+      <div class="platform-card web">
+        <h4>🌐 Web 端</h4>
+        <div class="layer web-static">
+          <div class="name">Vite 构建产物 (纯静态文件)</div>
+          <div class="desc">部署到任何静态文件服务器</div>
+        </div>
+        <div class="arrow">⬇ 浏览器渲染</div>
+        <div class="layer web-frontend">
+          <div class="name">Vue3 前端 (同一套代码)</div>
+          <div class="desc">shadcn/ui · 完整功能可用</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>项目结构</h3>
+    <div class="code-block">
+      <span class="comment"># 项目根目录</span>
+      anypctoolbox/<br>
+      ├── <span class="highlight">src-tauri/</span>          <span class="comment"># Rust 后端 (Tauri 2.x)</span><br>
+      │   ├── src/<br>
+      │   │   ├── main.rs     <span class="comment"># Tauri 应用入口</span><br>
+      │   │   └── lib.rs      <span class="comment"># 命令注册</span><br>
+      │   ├── Cargo.toml<br>
+      │   └── tauri.conf.json <span class="comment"># Tauri 配置</span><br>
+      ├── <span class="highlight">src/</span>                 <span class="comment"># Vue3 前端源码</span><br>
+      │   ├── App.vue         <span class="comment"># 根组件 (主题 + 布局)</span><br>
+      │   ├── main.ts         <span class="comment"># 入口文件</span><br>
+      │   ├── router/<br>
+      │   │   └── index.ts    <span class="comment"># 路由配置</span><br>
+      │   ├── views/<br>
+      │   │   ├── Home.vue    <span class="comment"># 主页 — 工具卡片引导</span><br>
+      │   │   ├── Markdown.vue<span class="comment"># Markdown 编辑 &amp; 预览</span><br>
+      │   │   └── Json.vue    <span class="comment"># JSON 编辑 &amp; 格式化</span><br>
+      │   ├── components/<br>
+      │   │   ├── ToolCard.vue<span class="comment"># 工具卡片组件</span><br>
+      │   │   ├── ThemeToggle.vue<span class="comment"># 主题切换</span><br>
+      │   │   └── AppLayout.vue<span class="comment"># 通用布局</span><br>
+      │   ├── composables/<br>
+      │   │   └── useTheme.ts <span class="comment"># 亮暗主题逻辑</span><br>
+      │   ├── lib/<br>
+      │   │   ├── markdown.ts <span class="comment"># Markdown 解析逻辑</span><br>
+      │   │   └── json.ts     <span class="comment"># JSON 格式化逻辑</span><br>
+      │   ├── assets/<br>
+      │   └── style.css       <span class="comment"># 全局样式</span><br>
+      ├── <span class="highlight">public/</span>              <span class="comment"># 静态资源</span><br>
+      ├── <span class="highlight">index.html</span><br>
+      ├── <span class="highlight">package.json</span><br>
+      ├── <span class="highlight">vite.config.ts</span><br>
+      ├── <span class="highlight">tsconfig.json</span><br>
+      └── <span class="highlight">components.json</span>     <span class="comment"># shadcn/ui 配置</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>技术栈与特性</h3>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="icon">🦀</div>
+        <div><div class="label">Rust (Tauri 2.x)</div><div class="desc">桌面端原生能力，系统 API 调用</div></div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">⚡</div>
+        <div><div class="label">Vite + Vue3</div><div class="desc">极速开发体验，Composition API</div></div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">🎨</div>
+        <div><div class="label">shadcn/ui</div><div class="desc">Radix UI 原语，统一设计语言</div></div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">🌙</div>
+        <div><div class="label">亮暗双主题</div><div class="desc">CSS 变量驱动，一键切换</div></div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">📦</div>
+        <div><div class="label">离线运行</div><div class="desc">所有依赖本地引入，无需联网</div></div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">🖥️</div>
+        <div><div class="label">跨平台</div><div class="desc">Windows/MacOS/Linux · amd64/arm64</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
