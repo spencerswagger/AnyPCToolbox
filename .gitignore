@@ -3,3 +3,7 @@ dist
 *.local
 .env
 .DS_Store
+
+# AI-generated design artifacts
+.superpowers/
+.trae-html-share-packages/
