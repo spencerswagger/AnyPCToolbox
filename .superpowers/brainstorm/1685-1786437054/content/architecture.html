@@ -1,0 +1,59 @@
+<h2>AnyPCToolbox — 整体架构</h2>
+<p class="subtitle">Tauri 2.x + Vite + Vue3 + shadcn/ui，一套代码覆盖桌面和 Web</p>
+
+<div class="section">
+  <h3>系统架构</h3>
+  <div style="display: flex; gap: 16px; margin-top: 12px;">
+    <div style="flex:1; background: #f0f4f8; border-radius: 12px; padding: 20px; text-align: center;">
+      <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #2563eb;">桌面端 (Tauri)</div>
+      <div style="background: #dbeafe; border-radius: 8px; padding: 12px; margin-bottom: 8px; text-align: left;">
+        <div style="font-size: 12px; color: #1e40af;">Rust 后端 (src-tauri/)</div>
+        <div style="font-size: 11px; color: #3b82f6; margin-top: 4px;">文件系统 · 系统API · 原生窗口</div>
+      </div>
+      <div style="border-left: 2px dashed #93c5fd; height: 16px; margin: 0 auto;"></div>
+      <div style="background: #e0e7ff; border-radius: 8px; padding: 12px; margin-bottom: 8px; text-align: left;">
+        <div style="font-size: 12px; color: #3730a3;">系统 WebView</div>
+        <div style="font-size: 11px; color: #6366f1; margin-top: 4px;">WKWebView / WebView2 / WebKitGTK</div>
+      </div>
+      <div style="border-left: 2px dashed #93c5fd; height: 16px; margin: 0 auto;"></div>
+      <div style="background: #eef2ff; border-radius: 8px; padding: 12px; text-align: left;">
+        <div style="font-size: 12px; color: #312e81;">Vue3 前端 (Vite 构建)</div>
+        <div style="font-size: 11px; color: #6366f1; margin-top: 4px;">shadcn/ui · 离线运行</div>
+      </div>
+    </div>
+    <div style="flex:1; background: #f0f4f8; border-radius: 12px; padding: 20px; text-align: center;">
+      <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #059669;">Web 端</div>
+      <div style="background: #d1fae5; border-radius: 8px; padding: 12px; margin-bottom: 8px; text-align: left;">
+        <div style="font-size: 12px; color: #065f46;">Vite 构建产物</div>
+        <div style="font-size: 11px; color: #059669; margin-top: 4px;">纯静态文件部署</div>
+      </div>
+      <div style="border-left: 2px dashed #6ee7b7; height: 16px; margin: 0 auto;"></div>
+      <div style="background: #ecfdf5; border-radius: 8px; padding: 12px; text-align: left;">
+        <div style="font-size: 12px; color: #064e3b;">Vue3 前端 (同一套代码)</div>
+        <div style="font-size: 11px; color: #10b981; margin-top: 4px;">shadcn/ui · 浏览器运行</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>项目结构</h3>
+  <div style="background: #1e293b; color: #e2e8f0; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 13px; line-height: 1.7;">
+    anypctoolbox/<br>
+    ├── src-tauri/          # Rust 后端 (Tauri)<br>
+    │   ├── src/main.rs     # 系统命令注册<br>
+    │   └── Cargo.toml<br>
+    ├── src/                # Vue3 前端源码<br>
+    │   ├── App.vue<br>
+    │   ├── router/         # 路由配置<br>
+    │   ├── views/          # 页面组件<br>
+    │   │   ├── Home.vue    # 主页 - 工具卡片<br>
+    │   │   ├── Markdown.vue # Markdown 工具<br>
+    │   │   └── Json.vue    # JSON 工具<br>
+    │   ├── components/     # 通用组件<br>
+    │   ├── lib/            # 工具逻辑层<br>
+    │   └── assets/         # 静态资源<br>
+    ├── package.json<br>
+    └── vite.config.ts
+  </div>
+</div>
