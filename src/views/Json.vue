@@ -193,18 +193,3 @@ async function handleCopy() {
   </div>
 </template>
 
-<style scoped>
-.json-key { color: #2563eb; }
-.json-string { color: #059669; }
-.json-number { color: #d97706; }
-.json-boolean { color: #c026d3; }
-.json-null { color: #94a3b8; }
-.json-bracket { color: #64748b; }
-
-:root.dark .json-key { color: #60a5fa; }
-:root.dark .json-string { color: #34d399; }
-:root.dark .json-number { color: #fbbf24; }
-:root.dark .json-boolean { color: #c084fc; }
-:root.dark .json-null { color: #64748b; }
-:root.dark .json-bracket { color: #94a3b8; }
-</style>
