@@ -1,0 +1,41 @@
+<script setup lang="ts">
+import ToolCard from '@/components/ToolCard.vue'
+
+const tools = [
+  {
+    icon: '📝',
+    name: 'Markdown 编辑器',
+    description: '编辑与实时预览 Markdown 文档，支持语法高亮与导出',
+    route: '/markdown',
+    tag: 'v1.0',
+  },
+  {
+    icon: '🧾',
+    name: 'JSON 编辑器',
+    description: '格式化、校验与预览 JSON 数据，错误定位一目了然',
+    route: '/json',
+    tag: 'v1.0',
+  },
+]
+</script>
+
+<template>
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">工具集合</h1>
+      <p class="mt-1 text-muted-foreground">选择一个工具开始使用</p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <ToolCard
+        v-for="tool in tools"
+        :key="tool.route"
+        v-bind="tool"
+      />
+      <div class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center opacity-60">
+        <span class="mb-3 text-4xl">➕</span>
+        <h3 class="text-base font-semibold">更多工具</h3>
+        <p class="mt-1 text-sm text-muted-foreground">即将上线</p>
+      </div>
+    </div>
+  </div>
+</template>
