@@ -67,11 +67,13 @@ const stats = computed(() => {
   }
 })
 
+const MIN_HEIGHT = 300
+
 function autoResize(el: HTMLTextAreaElement | null) {
   if (!el) return
   nextTick(() => {
     el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
+    el.style.height = Math.max(el.scrollHeight, MIN_HEIGHT) + 'px'
   })
 }
 
@@ -195,9 +197,9 @@ async function handleCopy() {
         <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           ✏️ 编辑
         </div>
-        <div class="editor-wrapper relative">
+        <div class="editor-wrapper relative min-h-[300px]">
           <pre
-            class="editor-code pointer-events-none m-0 whitespace-pre p-4 font-mono text-sm leading-relaxed"
+            class="editor-code pointer-events-none m-0 whitespace-pre p-4 font-mono text-sm leading-relaxed min-h-[300px]"
             aria-hidden="true"
           ><code class="hljs language-json" v-html="editorHighlight"></code></pre>
           <textarea
@@ -218,7 +220,7 @@ async function handleCopy() {
           👁️ 预览
         </div>
         <pre
-          class="hljs w-full whitespace-pre-wrap p-4 font-mono text-sm leading-relaxed"
+          class="hljs w-full whitespace-pre-wrap p-4 font-mono text-sm leading-relaxed min-h-[300px]"
           v-html="highlightedHtml"
         ></pre>
       </div>
@@ -247,6 +249,7 @@ async function handleCopy() {
   left: 0;
   right: 0;
   bottom: 0;
+  min-height: 300px;
   padding: 1rem;
   margin: 0;
   overflow: hidden;

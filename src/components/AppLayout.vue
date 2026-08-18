@@ -1,8 +1,28 @@
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ThemeToggle from './ThemeToggle.vue'
 
 const router = useRouter()
+const showBackTop = ref(false)
+
+const SCROLL_THRESHOLD = 300
+
+function handleScroll() {
+  showBackTop.value = window.scrollY > SCROLL_THRESHOLD
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 </script>
 
 <template>
@@ -24,5 +44,32 @@ const router = useRouter()
     <main class="mx-auto w-full max-w-[1800px] px-4 py-6 md:px-6 md:py-8">
       <slot />
     </main>
+
+    <Transition name="fade">
+      <button
+        v-show="showBackTop"
+        class="fixed bottom-6 right-6 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-input bg-background shadow-lg transition-all hover:bg-accent hover:text-accent-foreground"
+        title="回到顶部"
+        @click="scrollToTop"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 19V5"/>
+          <path d="M5 12l7-7 7 7"/>
+        </svg>
+      </button>
+    </Transition>
   </div>
 </template>
+
+<style>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+</style>

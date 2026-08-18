@@ -10,11 +10,13 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const previewHtml = computed(() => renderMarkdownSafe(input.value))
 
+const MIN_HEIGHT = 300
+
 function autoResize(el: HTMLTextAreaElement | null) {
   if (!el) return
   nextTick(() => {
     el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
+    el.style.height = Math.max(el.scrollHeight, MIN_HEIGHT) + 'px'
   })
 }
 
@@ -101,7 +103,7 @@ async function handleCopy() {
           ref="textareaRef"
           v-model="input"
           placeholder="在此输入 Markdown..."
-          class="w-full resize-none overflow-hidden bg-transparent p-4 font-mono text-sm leading-relaxed outline-none"
+          class="w-full resize-none overflow-hidden bg-transparent p-4 font-mono text-sm leading-relaxed outline-none min-h-[300px]"
           @input="handleInput"
         />
       </div>
@@ -110,7 +112,7 @@ async function handleCopy() {
           👁️ 预览
         </div>
         <div
-          class="prose prose-sm dark:prose-invert w-full p-4 max-w-none"
+          class="prose prose-sm dark:prose-invert w-full p-4 max-w-none min-h-[300px]"
           v-html="previewHtml"
         />
       </div>
