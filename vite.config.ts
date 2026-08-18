@@ -9,7 +9,6 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     __TAURI__: 'false',
-    __TAURI_MOBILE__: 'false',
   },
   resolve: {
     alias: {

@@ -58,18 +58,6 @@ const versionJson = {
 
 writeFileSync(resolve(artifactsDir, 'version.json'), JSON.stringify(versionJson, null, 2))
 
-const mobileUpdateJson = {
-  version,
-  buildTime,
-  downloadUrl: `${downloadBaseUrl}/mobile/anypctoolbox-${version}.apk`,
-  notes: changelog,
-  iosUrl: `https://apps.apple.com/app/id${process.env.IOS_APP_ID || ''}`,
-  androidUrl: `https://play.google.com/store/apps/details?id=${process.env.ANDROID_PACKAGE || ''}`,
-}
-
-writeFileSync(resolve(artifactsDir, 'mobile-update.json'), JSON.stringify(mobileUpdateJson, null, 2))
-
 console.log(`Generated update artifacts for version ${version}:`)
 console.log(`  - updater.json (Tauri desktop)`)
 console.log(`  - version.json (Web)`)
-console.log(`  - mobile-update.json (Mobile)`)

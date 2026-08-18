@@ -11,7 +11,7 @@ configureUpdate({
 
 createApp(App).use(router).mount('#app')
 
-if ('serviceWorker' in navigator && !__TAURI__ && !__TAURI_MOBILE__) {
+if ('serviceWorker' in navigator && !__TAURI__) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {
       console.warn('Service Worker registration failed')

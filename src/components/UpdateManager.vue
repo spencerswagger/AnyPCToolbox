@@ -19,7 +19,6 @@ const {
 } = useUpdate()
 
 const isTauri = ref(false)
-const isMobile = ref(false)
 const tauriUpdateAvailable = ref(false)
 const tauriUpdateVersion = ref('')
 const isDownloading = ref(false)
@@ -30,8 +29,6 @@ onMounted(async () => {
   if (typeof window !== 'undefined' && '__TAURI__' in window) {
     isTauri.value = true
     await checkTauriUpdate()
-  } else if (typeof window !== 'undefined' && '__TAURI_MOBILE__' in window) {
-    isMobile.value = true
   }
 })
 
@@ -110,8 +107,6 @@ function handleApplyUpdate() {
                 <template v-if="isTauri && tauriUpdateAvailable">桌面端更新可用</template>
                 <template v-else-if="hasUpdate">有新版本可用</template>
                 <template v-else-if="updateStatus === 'checking'">正在检查更新...</template>
-                <template v-else-if="updateStatus === 'downloading'">正在下载...</template>
-                <template v-else-if="updateStatus === 'ready'">更新已就绪</template>
                 <template v-else-if="updateStatus === 'error'">检查更新失败</template>
                 <template v-else>已是最新版本</template>
               </h2>
@@ -151,37 +146,6 @@ function handleApplyUpdate() {
               class="h-full rounded-full bg-primary transition-all duration-300"
               :style="{ width: `${effectiveProgress}%` }"
             />
-          </div>
-        </div>
-
-        <!-- Mobile Store Info -->
-        <div v-if="isMobile" class="mb-4 rounded-lg border bg-muted/50 p-4">
-          <div class="flex items-start gap-3">
-            <AlertCircle class="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-            <div class="text-sm text-muted-foreground">
-              <p class="mb-1 font-medium text-foreground">移动端更新</p>
-              <p>
-                移动端应用需通过应用商店更新。请前往
-                <a
-                  class="ml-1 font-medium text-primary hover:underline"
-                  href="https://apps.apple.com"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  App Store
-                </a>
-                或
-                <a
-                  class="ml-1 font-medium text-primary hover:underline"
-                  href="https://play.google.com"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  Google Play
-                </a>
-                检查新版本。
-              </p>
-            </div>
           </div>
         </div>
 

@@ -2,13 +2,12 @@
 
 ## Overview
 
-The update server serves three types of update metadata:
+The update server serves two types of update metadata:
 
 | File | Purpose | Consumers |
 |---|---|---|
 | `updater.json` | Tauri desktop update manifest | Tauri desktop app |
 | `version.json` | Web app version info | Web app (SPA/PWA) |
-| `mobile-update.json` | Mobile app update info | iOS/Android apps |
 
 ## Directory Structure
 
@@ -16,7 +15,6 @@ The update server serves three types of update metadata:
 /
 ├── updater.json          # Tauri desktop updater config
 ├── version.json          # Web app version info
-├── mobile-update.json    # Mobile app update info
 ├── releases/             # Download artifacts
 │   ├── v1.0.0/
 │   │   ├── anypctoolbox_1.0.0_aarch64-apple-darwin.tar.gz
@@ -62,26 +60,10 @@ Web app version check endpoint (with cache-busting).
 }
 ```
 
-### GET /mobile-update.json
-Mobile app update check endpoint.
-
-**Response:**
-```json
-{
-  "version": "1.1.0",
-  "buildTime": "2026-08-18T10:00:00Z",
-  "downloadUrl": "https://cdn.example.com/releases/v1.1.0/mobile/anypctoolbox-1.1.0.apk",
-  "notes": "Release notes",
-  "iosUrl": "https://apps.apple.com/app/idXXXX",
-  "androidUrl": "https://play.google.com/store/apps/details?id=com.example.app"
-}
-```
-
 ## Cache Strategy
 
 - **`updater.json`**: Cache-Control: max-age=0, must-revalidate (always check latest)
 - **`version.json`**: Cache-Control: max-age=60 (1 minute cache for web)
-- **`mobile-update.json`**: Cache-Control: max-age=0, must-revalidate
 - **Release artifacts**: Cache-Control: public, max-age=31536000, immutable
 
 ## Deployment
@@ -110,7 +92,7 @@ server {
 
 ### Cloudflare/CDN
 
-1. Upload `updater.json`, `version.json`, `mobile-update.json` to the CDN
+1. Upload `updater.json`, `version.json` to the CDN
 2. Set cache-busting headers on JSON files
 3. Upload release artifacts with long-term cache settings
 
@@ -121,7 +103,7 @@ server {
 npm run build
 
 # 2. Generate update artifacts
-node scripts/generate-update-artifacts.js
+npm run generate:update
 
 # 3. Upload to server
 # The script generates files in ./release-artifacts/
