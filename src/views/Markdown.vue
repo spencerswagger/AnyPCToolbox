@@ -1,13 +1,27 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { renderMarkdownSafe } from '@/lib/markdown'
 import 'highlight.js/styles/github.css'
 
 const router = useRouter()
 const input = ref('')
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const previewHtml = computed(() => renderMarkdownSafe(input.value))
+
+function autoResize(el: HTMLTextAreaElement | null) {
+  if (!el) return
+  nextTick(() => {
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  })
+}
+
+function handleInput(e: Event) {
+  const target = e.target as HTMLTextAreaElement
+  autoResize(target)
+}
 
 function handleImport() {
   const inputEl = document.createElement('input')
@@ -19,6 +33,7 @@ function handleImport() {
     const reader = new FileReader()
     reader.onload = () => {
       input.value = reader.result as string
+      nextTick(() => autoResize(textareaRef.value))
     }
     reader.readAsText(file)
   }
@@ -83,9 +98,11 @@ async function handleCopy() {
           ✏️ 编辑
         </div>
         <textarea
+          ref="textareaRef"
           v-model="input"
           placeholder="在此输入 Markdown..."
-          class="min-h-[400px] w-full resize-none bg-transparent p-4 font-mono text-sm outline-none"
+          class="w-full resize-none overflow-hidden bg-transparent p-4 font-mono text-sm leading-relaxed outline-none"
+          @input="handleInput"
         />
       </div>
       <div class="flex flex-col rounded-lg border">
@@ -93,7 +110,7 @@ async function handleCopy() {
           👁️ 预览
         </div>
         <div
-          class="prose prose-sm dark:prose-invert min-h-[400px] w-full p-4 max-w-none"
+          class="prose prose-sm dark:prose-invert w-full p-4 max-w-none"
           v-html="previewHtml"
         />
       </div>

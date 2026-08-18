@@ -21,7 +21,7 @@ const router = useRouter()
         </div>
       </div>
     </header>
-    <main class="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
+    <main class="mx-auto w-full max-w-[1800px] px-4 py-6 md:px-6 md:py-8">
       <slot />
     </main>
   </div>

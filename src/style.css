@@ -58,17 +58,63 @@
   }
 }
 
-/* JSON syntax highlighting */
-.json-key { color: #2563eb; }
-.json-string { color: #059669; }
-.json-number { color: #d97706; }
-.json-boolean { color: #c026d3; }
-.json-null { color: #94a3b8; }
-.json-bracket { color: #64748b; }
+/* highlight.js dark mode adaptation */
+.dark .hljs {
+  color: #c9d1d9;
+  background: transparent !important;
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-literal,
+.dark .hljs-section,
+.dark .hljs-link {
+  color: #ff7b72;
+}
+.dark .hljs-string,
+.dark .hljs-attr,
+.dark .hljs-symbol,
+.dark .hljs-bullet,
+.dark .hljs-addition {
+  color: #a5d6ff;
+}
+.dark .hljs-title,
+.dark .hljs-name,
+.dark .hljs-type,
+.dark .hljs-built_in {
+  color: #d2a8ff;
+}
+.dark .hljs-comment,
+.dark .hljs-quote,
+.dark .hljs-deletion {
+  color: #8b949e;
+}
+.dark .hljs-number,
+.dark .hljs-regexp {
+  color: #79c0ff;
+}
+.dark .hljs-variable,
+.dark .hljs-template-variable {
+  color: #ffa657;
+}
 
-.dark .json-key { color: #60a5fa; }
-.dark .json-string { color: #34d399; }
-.dark .json-number { color: #fbbf24; }
-.dark .json-boolean { color: #c084fc; }
-.dark .json-null { color: #64748b; }
-.dark .json-bracket { color: #94a3b8; }
+/* Editor overlay textarea selection */
+.editor-textarea::selection,
+.editor-textarea *::selection {
+  background: hsl(var(--primary) / 0.35);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
