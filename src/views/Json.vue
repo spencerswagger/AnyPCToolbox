@@ -1,19 +1,50 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { validateJson, formatJson, compressJson, syntaxHighlightJson } from '@/lib/json'
+import hljs from 'highlight.js'
+import { formatJson, compressJson } from '@/lib/json'
+import JsonNode from '@/components/JsonNode.vue'
+import 'highlight.js/styles/github.css'
 
 const router = useRouter()
 const input = ref('')
-const error = ref<string | null>(null)
-const parsed = ref<unknown>(null)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
-const highlightedHtml = computed(() => {
-  if (parsed.value === null || parsed.value === undefined) {
-    return '<span class="text-muted-foreground">输入 JSON 数据开始预览...</span>'
+const error = computed(() => {
+  if (!input.value.trim()) return null
+  try {
+    JSON.parse(input.value)
+    return null
+  } catch (e) {
+    return (e as Error).message
   }
-  return syntaxHighlightJson(parsed.value)
 })
+
+const parsed = computed(() => {
+  if (!input.value.trim()) return null
+  try {
+    return JSON.parse(input.value)
+  } catch {
+    return null
+  }
+})
+
+const editorHighlight = computed(() => {
+  if (!input.value.trim()) {
+    return ''
+  }
+  try {
+    return hljs.highlight(input.value, { language: 'json' }).value
+  } catch {
+    return escapeHtml(input.value)
+  }
+})
+
+function escapeHtml(str: string): string {
+  const div = document.createElement('div')
+  div.textContent = str
+  return div.innerHTML
+}
 
 const stats = computed(() => {
   if (!input.value.trim()) {
@@ -26,14 +57,31 @@ const stats = computed(() => {
   }
 })
 
+const MIN_HEIGHT = 300
+
+function autoResize(el: HTMLTextAreaElement | null) {
+  if (!el) return
+  nextTick(() => {
+    el.style.height = 'auto'
+    el.style.height = Math.max(el.scrollHeight, MIN_HEIGHT) + 'px'
+  })
+}
+
+function handleInput(e: Event) {
+  const target = e.target as HTMLTextAreaElement
+  autoResize(target)
+}
+
+watch(input, () => {
+  nextTick(() => autoResize(textareaRef.value))
+})
+
 function handleFormat() {
   if (!input.value.trim()) return
   try {
     input.value = formatJson(input.value)
-    error.value = null
-    parsed.value = JSON.parse(input.value)
-  } catch (e) {
-    error.value = (e as Error).message
+  } catch {
+    // error is handled by computed
   }
 }
 
@@ -41,26 +89,8 @@ function handleCompress() {
   if (!input.value.trim()) return
   try {
     input.value = compressJson(input.value)
-    error.value = null
-    parsed.value = JSON.parse(input.value)
-  } catch (e) {
-    error.value = (e as Error).message
-  }
-}
-
-function handleValidate() {
-  if (!input.value.trim()) {
-    error.value = null
-    parsed.value = null
-    return
-  }
-  const result = validateJson(input.value)
-  if (result.valid) {
-    error.value = null
-    parsed.value = result.parsed
-  } else {
-    error.value = result.error
-    parsed.value = null
+  } catch {
+    // error is handled by computed
   }
 }
 
@@ -74,7 +104,6 @@ function handleImport() {
     const reader = new FileReader()
     reader.onload = () => {
       input.value = reader.result as string
-      handleValidate()
     }
     reader.readAsText(file)
   }
@@ -146,13 +175,6 @@ async function handleCopy() {
       >
         压缩
       </button>
-      <div class="h-5 w-px bg-border" />
-      <button
-        class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-        @click="handleValidate"
-      >
-        校验
-      </button>
     </div>
 
     <div v-if="error" class="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -165,20 +187,34 @@ async function handleCopy() {
         <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           ✏️ 编辑
         </div>
-        <textarea
-          v-model="input"
-          placeholder="输入 JSON 数据..."
-          class="min-h-[400px] w-full resize-none bg-transparent p-4 font-mono text-sm outline-none"
-        />
+        <div class="editor-wrapper relative min-h-[300px]">
+          <pre
+            class="editor-code pointer-events-none m-0 whitespace-pre p-4 font-mono text-sm leading-relaxed min-h-[300px]"
+            aria-hidden="true"
+          ><code class="hljs language-json" v-html="editorHighlight"></code></pre>
+          <textarea
+            ref="textareaRef"
+            v-model="input"
+            placeholder="输入 JSON 数据..."
+            spellcheck="false"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            class="editor-textarea w-full resize-none overflow-hidden bg-transparent p-4 font-mono text-sm leading-relaxed outline-none"
+            @input="handleInput"
+          />
+        </div>
       </div>
       <div class="flex flex-col rounded-lg border">
         <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           👁️ 预览
         </div>
-        <div
-          class="min-h-[400px] w-full p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap"
-          v-html="highlightedHtml"
-        />
+        <div v-if="parsed === null" class="flex min-h-[300px] items-center justify-center p-4 text-sm text-muted-foreground">
+          输入 JSON 数据开始预览...
+        </div>
+        <div v-else class="w-full p-4 min-h-[300px] overflow-auto">
+          <JsonNode :data="parsed" />
+        </div>
       </div>
     </div>
 
@@ -193,3 +229,47 @@ async function handleCopy() {
   </div>
 </template>
 
+<style scoped>
+.editor-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.editor-code {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 300px;
+  padding: 1rem;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.875rem;
+  line-height: 1.625;
+  background: transparent !important;
+}
+
+.editor-code code {
+  background: transparent !important;
+  padding: 0 !important;
+  white-space: pre !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+.editor-textarea {
+  position: relative;
+  color: transparent;
+  caret-color: hsl(var(--foreground));
+  background: transparent;
+}
+
+.editor-textarea::selection {
+  background: hsl(var(--primary) / 0.3);
+}
+</style>
