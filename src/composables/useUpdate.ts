@@ -25,6 +25,15 @@ const state = ref<UpdateState>({
 let versionFileUrl = '/version.json'
 let checkInterval: number | null = null
 let onUpdateAvailableCallbacks: Array<(info: VersionInfo) => void> = []
+let currentUpdate: {
+  version: string
+  date?: string
+  body?: string
+  download: (onEvent?: (event: { event: string; data: any }) => void) => Promise<void>
+  install: () => Promise<void>
+} | null = null
+
+const isTauri = __TAURI__
 
 export function configureUpdate(options: {
   versionFileUrl?: string
@@ -50,33 +59,14 @@ function compareVersions(a: string, b: string): number {
   return 0
 }
 
-async function fetchVersionInfo(): Promise<VersionInfo | null> {
+async function checkWebUpdate(): Promise<boolean> {
   try {
     const response = await fetch(versionFileUrl, {
       cache: 'no-store',
       headers: { 'Cache-Control': 'no-cache' },
     })
-    if (!response.ok) return null
-    return await response.json()
-  } catch {
-    return null
-  }
-}
-
-export async function checkForUpdate(): Promise<boolean> {
-  if (state.value.status === 'checking' || state.value.status === 'downloading') {
-    return false
-  }
-
-  state.value.status = 'checking'
-  state.value.errorMessage = ''
-
-  try {
-    const info = await fetchVersionInfo()
-    if (!info) {
-      state.value.status = 'idle'
-      return false
-    }
+    if (!response.ok) return false
+    const info = await response.json() as VersionInfo
 
     const hasUpdate = compareVersions(info.version, state.value.currentVersion) > 0
     if (hasUpdate) {
@@ -88,25 +78,79 @@ export async function checkForUpdate(): Promise<boolean> {
 
     state.value.status = 'idle'
     return false
-  } catch (err: unknown) {
-    state.value.status = 'error'
-    state.value.errorMessage = err instanceof Error ? err.message : '未知错误'
+  } catch {
+    state.value.status = 'idle'
     return false
   }
 }
 
-export function applyUpdate() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      registrations.forEach((registration) => {
-        if (registration.waiting) {
-          registration.waiting.postMessage('SKIP_WAITING')
-        }
-        registration.update()
-      })
-    })
+async function checkTauriUpdate(): Promise<boolean> {
+  try {
+    const { check } = await import('@tauri-apps/plugin-updater')
+    const update = await check()
+    if (update) {
+      currentUpdate = update
+      state.value.latestVersion = update.version
+      state.value.status = 'available'
+      onUpdateAvailableCallbacks.forEach((cb) => cb({
+        version: update.version,
+        buildTime: update.date || '',
+        notes: update.body || '',
+      }))
+      return true
+    }
+    state.value.status = 'idle'
+    return false
+  } catch {
+    state.value.status = 'idle'
+    return false
   }
-  window.location.reload()
+}
+
+export async function checkForUpdate(): Promise<boolean> {
+  if (state.value.status === 'checking' || state.value.status === 'downloading') {
+    return false
+  }
+
+  state.value.status = 'checking'
+  state.value.errorMessage = ''
+
+  if (isTauri) {
+    return checkTauriUpdate()
+  }
+  return checkWebUpdate()
+}
+
+async function handleDownloadEvent(event: { event: string; data: any }) {
+  if (event.event === 'Progress') {
+    state.value.downloadProgress = event.data.chunkLength
+  }
+}
+
+export async function applyUpdate() {
+  if (isTauri && currentUpdate) {
+    try {
+      state.value.status = 'downloading'
+      await currentUpdate.download(handleDownloadEvent)
+      await currentUpdate.install()
+      state.value.status = 'ready'
+    } catch (err: unknown) {
+      state.value.status = 'error'
+      state.value.errorMessage = err instanceof Error ? err.message : '更新失败'
+    }
+  } else {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => {
+          if (registration.waiting) {
+            registration.waiting.postMessage('SKIP_WAITING')
+          }
+          registration.update()
+        })
+      })
+    }
+    window.location.reload()
+  }
 }
 
 export function onUpdateAvailable(callback: (info: VersionInfo) => void) {

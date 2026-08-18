@@ -1,15 +1,36 @@
 declare module '@tauri-apps/plugin-updater' {
   export interface Update {
-    version: string
-    currentVersion: string
-    date: string
-    body?: string
-    downloadUrl?: string
-    downloadAndInstall(onProgress?: (progress: { chunkLength: number }) => void): Promise<void>
+    readonly version: string
+    readonly currentVersion: string
+    readonly date?: string
+    readonly body?: string
+    readonly rawJson: Record<string, unknown>
+    available: boolean
+    download(onEvent?: (event: { event: string; data: any }) => void): Promise<void>
+    install(): Promise<void>
+    downloadAndInstall(onEvent?: (event: { event: string; data: any }) => void): Promise<void>
     close(): Promise<void>
   }
 
-  export function checkUpdate(): Promise<Update | null>
+  export interface CheckOptions {
+    headers?: HeadersInit
+    timeout?: number
+    proxy?: string
+    target?: string
+    allowDowngrades?: boolean
+  }
+
+  export interface DownloadOptions {
+    headers?: HeadersInit
+    timeout?: number
+  }
+
+  export interface DownloadEvent {
+    event: string
+    data: any
+  }
+
+  export function check(options?: CheckOptions): Promise<Update | null>
 }
 
 declare module '@tauri-apps/plugin-shell' {

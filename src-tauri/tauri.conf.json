@@ -1,0 +1,49 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "AnyPCToolbox",
+  "version": "1.0.0",
+  "identifier": "com.anypctoolbox.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "AnyPCToolbox",
+        "width": 800,
+        "height": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  },
+  "updater": {
+    "active": true,
+    "endpoints": [
+      "https://updates.example.com/updater.json"
+    ],
+    "timeout": 10,
+    "dialog": true,
+    "pubkey": "RWScUR6MaUaM8Rf7qnZ+W5GR1SZKmUWHbqOq3ig+yXL/Ms+q6uhGrq4O"
+  }
+}

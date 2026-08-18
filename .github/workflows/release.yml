@@ -38,9 +38,7 @@ jobs:
       - name: Upload update artifacts to release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release-artifacts/updater.json
-            release-artifacts/version.json
+          files: release-artifacts/version.json
           tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,48 +92,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: ${{ github.ref_name }}
           releaseDraft: true
           target: ${{ matrix.target }}
-          tauriConfig: |
-            {
-              "build": {
-                "beforeDevCommand": "npm run dev",
-                "beforeBuildCommand": "npm run build",
-                "devUrl": "http://localhost:1420",
-                "frontendDist": "../dist"
-              },
-              "bundle": {
-                "active": true,
-                "icon": [
-                  "icons/32x32.png",
-                  "icons/128x128.png",
-                  "icons/128x128@2x.png",
-                  "icons/icon.icns",
-                  "icons/icon.ico"
-                ],
-                "targets": "all"
-              },
-              "app": {
-                "windows": [
-                  {
-                    "title": "AnyPCToolbox",
-                    "width": 800,
-                    "height": 600
-                  }
-                ]
-              },
-              "updater": {
-                "active": true,
-                "endpoints": [
-                  "${{ vars.DOWNLOAD_BASE_URL || 'https://updates.example.com' }}/updater.json"
-                ],
-                "timeout": 10,
-                "dialog": true
-              }
-            }
 
   upload-web:
     needs: [generate-updater-json, publish-tauri]

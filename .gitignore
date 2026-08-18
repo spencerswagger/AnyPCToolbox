@@ -4,6 +4,8 @@ dist
 .env
 .DS_Store
 release-artifacts/
+private.key
+app-icon.svg
 
 # AI-generated design artifacts
 .superpowers/

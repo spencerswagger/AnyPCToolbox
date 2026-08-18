@@ -34,8 +34,8 @@ onMounted(async () => {
 
 async function checkTauriUpdate() {
   try {
-    const { checkUpdate: tauriCheckUpdate } = await import('@tauri-apps/plugin-updater')
-    const update = await tauriCheckUpdate()
+    const { check } = await import('@tauri-apps/plugin-updater')
+    const update = await check()
     if (update) {
       tauriUpdateAvailable.value = true
       tauriUpdateVersion.value = update.version
@@ -47,15 +47,17 @@ async function checkTauriUpdate() {
 
 async function downloadAndInstall() {
   try {
-    const { checkUpdate: tauriCheckUpdate } = await import('@tauri-apps/plugin-updater')
-    const update = await tauriCheckUpdate()
+    const { check } = await import('@tauri-apps/plugin-updater')
+    const update = await check()
     if (!update) return
 
     isDownloading.value = true
     downloadProgressVal.value = 0
 
-    await update.downloadAndInstall((progress: { chunkLength: number }) => {
-      downloadProgressVal.value = progress.chunkLength
+    await update.downloadAndInstall((event: any) => {
+      if (event.event === 'Progress') {
+        downloadProgressVal.value = event.data.chunkLength
+      }
     })
 
     await update.close()

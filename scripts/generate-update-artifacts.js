@@ -14,51 +14,15 @@ if (!existsSync(artifactsDir)) {
 }
 
 const baseUrl = process.env.DOWNLOAD_BASE_URL || 'https://updates.example.com'
-const releaseUrl = `${baseUrl}/releases/v${version}`
-
-const updaterJson = {
-  version,
-  notes: changelog || `${version} 更新`,
-  pub_date: buildTime,
-  platforms: {
-    'darwin-aarch64': {
-      signature: '',
-      url: `${releaseUrl}/anypctoolbox_${version}_aarch64-apple-darwin.tar.gz`,
-    },
-    'darwin-x86_64': {
-      signature: '',
-      url: `${releaseUrl}/anypctoolbox_${version}_x86_64-apple-darwin.tar.gz`,
-    },
-    'windows-x86_64': {
-      signature: '',
-      url: `${releaseUrl}/anypctoolbox_${version}_x86_64-pc-windows-msvc.zip`,
-    },
-    'windows-aarch64': {
-      signature: '',
-      url: `${releaseUrl}/anypctoolbox_${version}_aarch64-pc-windows-msvc.zip`,
-    },
-    'linux-x86_64': {
-      signature: '',
-      url: `${releaseUrl}/anypctoolbox_${version}_x86_64-unknown-linux-gnu.tar.gz`,
-    },
-    'linux-aarch64': {
-      signature: '',
-      url: `${releaseUrl}/anypctoolbox_${version}_aarch64-unknown-linux-gnu.tar.gz`,
-    },
-  },
-}
-
-writeFileSync(resolve(artifactsDir, 'updater.json'), JSON.stringify(updaterJson, null, 2))
 
 const versionJson = {
   version,
   buildTime,
   notes: changelog,
+  webDownloadUrl: `${baseUrl}/web/`,
 }
 
 writeFileSync(resolve(artifactsDir, 'version.json'), JSON.stringify(versionJson, null, 2))
 
 console.log(`Generated update artifacts for version ${version}:`)
-console.log(`  - updater.json (Tauri desktop): ${baseUrl}/updater.json`)
 console.log(`  - version.json (Web): ${baseUrl}/version.json`)
-console.log(`  - Desktop downloads base: ${releaseUrl}`)
