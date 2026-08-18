@@ -48,7 +48,9 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            libasound2-dev \
+            libxdo-dev
 
       - name: Install frontend dependencies
         run: npm ci
@@ -62,35 +64,6 @@ jobs:
           releaseName: ${{ github.ref_name }}
           releaseDraft: true
           target: ${{ matrix.target }}
-          tauriConfig: |
-            {
-              "build": {
-                "beforeDevCommand": "npm run dev",
-                "beforeBuildCommand": "npm run build",
-                "devUrl": "http://localhost:1420",
-                "frontendDist": "../dist"
-              },
-              "bundle": {
-                "active": true,
-                "icon": [
-                  "icons/32x32.png",
-                  "icons/128x128.png",
-                  "icons/128x128@2x.png",
-                  "icons/icon.icns",
-                  "icons/icon.ico"
-                ],
-                "targets": "all"
-              },
-              "app": {
-                "windows": [
-                  {
-                    "title": "AnyPCToolbox",
-                    "width": 800,
-                    "height": 600
-                  }
-                ]
-              }
-            }
 
   upload-web:
     needs: publish-tauri

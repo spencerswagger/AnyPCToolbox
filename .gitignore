@@ -7,3 +7,8 @@ dist
 # AI-generated design artifacts
 .superpowers/
 .trae-html-share-packages/
+
+# Tauri
+src-tauri/target
+src-tauri/gen/schemas
+src-tauri/.tauri

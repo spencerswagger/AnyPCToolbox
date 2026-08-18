@@ -1,0 +1,18 @@
+[package]
+name = "anypctoolbox"
+version = "0.0.1"
+description = "AnyPC Toolbox"
+edition = "2021"
+
+[lib]
+name = "anypctoolbox_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
