@@ -1,7 +1,6 @@
 import { writeFileSync, existsSync, mkdirSync } from 'fs'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { dirname } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -14,7 +13,9 @@ if (!existsSync(artifactsDir)) {
   mkdirSync(artifactsDir, { recursive: true })
 }
 
-const downloadBaseUrl = process.env.DOWNLOAD_BASE_URL || `https://cdn.example.com/releases/v${version}`
+const downloadBaseUrl = process.env.DOWNLOAD_BASE_URL
+  ? `${process.env.DOWNLOAD_BASE_URL}/releases/v${version}`
+  : `https://cdn.example.com/releases/v${version}`
 
 const updaterJson = {
   version,
@@ -50,10 +51,13 @@ const updaterJson = {
 
 writeFileSync(resolve(artifactsDir, 'updater.json'), JSON.stringify(updaterJson, null, 2))
 
+const webDownloadUrl = `${downloadBaseUrl}/anypctoolbox-web-v${version}.zip`
+
 const versionJson = {
   version,
   buildTime,
   notes: changelog,
+  webDownloadUrl,
 }
 
 writeFileSync(resolve(artifactsDir, 'version.json'), JSON.stringify(versionJson, null, 2))
@@ -61,3 +65,5 @@ writeFileSync(resolve(artifactsDir, 'version.json'), JSON.stringify(versionJson,
 console.log(`Generated update artifacts for version ${version}:`)
 console.log(`  - updater.json (Tauri desktop)`)
 console.log(`  - version.json (Web)`)
+console.log(`Download URLs base: ${downloadBaseUrl}`)
+console.log(`Web download: ${webDownloadUrl}`)
