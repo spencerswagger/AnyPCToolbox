@@ -97,6 +97,29 @@
   color: #ffa657;
 }
 
+/* JSON tree view syntax highlighting */
+.json-key { color: #2563eb; }
+.json-string { color: #059669; }
+.json-number { color: #d97706; }
+.json-boolean { color: #c026d3; }
+.json-null { color: #94a3b8; }
+.json-bracket { color: #64748b; }
+.json-colon { color: #64748b; }
+.json-comma { color: #64748b; }
+.json-ellipsis { color: #94a3b8; }
+.json-collapsed { font-style: italic; }
+
+.dark .json-key { color: #60a5fa; }
+.dark .json-string { color: #34d399; }
+.dark .json-number { color: #fbbf24; }
+.dark .json-boolean { color: #c084fc; }
+.dark .json-null { color: #64748b; }
+.dark .json-bracket { color: #94a3b8; }
+.dark .json-colon { color: #94a3b8; }
+.dark .json-comma { color: #94a3b8; }
+.dark .json-ellipsis { color: #64748b; }
+.dark .json-collapsed { color: #64748b; }
+
 /* Editor overlay textarea selection */
 .editor-textarea::selection,
 .editor-textarea *::selection {

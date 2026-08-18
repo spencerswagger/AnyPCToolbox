@@ -3,6 +3,7 @@ import { ref, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import hljs from 'highlight.js'
 import { formatJson, compressJson } from '@/lib/json'
+import JsonNode from '@/components/JsonNode.vue'
 import 'highlight.js/styles/github.css'
 
 const router = useRouter()
@@ -25,17 +26,6 @@ const parsed = computed(() => {
     return JSON.parse(input.value)
   } catch {
     return null
-  }
-})
-
-const highlightedHtml = computed(() => {
-  if (!input.value.trim()) {
-    return '<span class="text-muted-foreground">输入 JSON 数据开始预览...</span>'
-  }
-  try {
-    return hljs.highlight(input.value, { language: 'json' }).value
-  } catch {
-    return escapeHtml(input.value)
   }
 })
 
@@ -219,10 +209,12 @@ async function handleCopy() {
         <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           👁️ 预览
         </div>
-        <pre
-          class="hljs w-full whitespace-pre-wrap p-4 font-mono text-sm leading-relaxed min-h-[300px]"
-          v-html="highlightedHtml"
-        ></pre>
+        <div v-if="parsed === null" class="flex min-h-[300px] items-center justify-center p-4 text-sm text-muted-foreground">
+          输入 JSON 数据开始预览...
+        </div>
+        <div v-else class="w-full p-4 min-h-[300px] overflow-auto">
+          <JsonNode :data="parsed" />
+        </div>
       </div>
     </div>
 
