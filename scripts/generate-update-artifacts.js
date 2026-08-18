@@ -13,9 +13,8 @@ if (!existsSync(artifactsDir)) {
   mkdirSync(artifactsDir, { recursive: true })
 }
 
-const downloadBaseUrl = process.env.DOWNLOAD_BASE_URL
-  ? `${process.env.DOWNLOAD_BASE_URL}/releases/v${version}`
-  : `https://cdn.example.com/releases/v${version}`
+const baseUrl = process.env.DOWNLOAD_BASE_URL || 'https://updates.example.com'
+const releaseUrl = `${baseUrl}/releases/v${version}`
 
 const updaterJson = {
   version,
@@ -24,46 +23,42 @@ const updaterJson = {
   platforms: {
     'darwin-aarch64': {
       signature: '',
-      url: `${downloadBaseUrl}/anypctoolbox_${version}_aarch64-apple-darwin.tar.gz`,
+      url: `${releaseUrl}/anypctoolbox_${version}_aarch64-apple-darwin.tar.gz`,
     },
     'darwin-x86_64': {
       signature: '',
-      url: `${downloadBaseUrl}/anypctoolbox_${version}_x86_64-apple-darwin.tar.gz`,
+      url: `${releaseUrl}/anypctoolbox_${version}_x86_64-apple-darwin.tar.gz`,
     },
     'windows-x86_64': {
       signature: '',
-      url: `${downloadBaseUrl}/anypctoolbox_${version}_x86_64-pc-windows-msvc.zip`,
+      url: `${releaseUrl}/anypctoolbox_${version}_x86_64-pc-windows-msvc.zip`,
     },
     'windows-aarch64': {
       signature: '',
-      url: `${downloadBaseUrl}/anypctoolbox_${version}_aarch64-pc-windows-msvc.zip`,
+      url: `${releaseUrl}/anypctoolbox_${version}_aarch64-pc-windows-msvc.zip`,
     },
     'linux-x86_64': {
       signature: '',
-      url: `${downloadBaseUrl}/anypctoolbox_${version}_x86_64-unknown-linux-gnu.tar.gz`,
+      url: `${releaseUrl}/anypctoolbox_${version}_x86_64-unknown-linux-gnu.tar.gz`,
     },
     'linux-aarch64': {
       signature: '',
-      url: `${downloadBaseUrl}/anypctoolbox_${version}_aarch64-unknown-linux-gnu.tar.gz`,
+      url: `${releaseUrl}/anypctoolbox_${version}_aarch64-unknown-linux-gnu.tar.gz`,
     },
   },
 }
 
 writeFileSync(resolve(artifactsDir, 'updater.json'), JSON.stringify(updaterJson, null, 2))
 
-const webDownloadUrl = `${downloadBaseUrl}/anypctoolbox-web-v${version}.zip`
-
 const versionJson = {
   version,
   buildTime,
   notes: changelog,
-  webDownloadUrl,
 }
 
 writeFileSync(resolve(artifactsDir, 'version.json'), JSON.stringify(versionJson, null, 2))
 
 console.log(`Generated update artifacts for version ${version}:`)
-console.log(`  - updater.json (Tauri desktop)`)
-console.log(`  - version.json (Web)`)
-console.log(`Download URLs base: ${downloadBaseUrl}`)
-console.log(`Web download: ${webDownloadUrl}`)
+console.log(`  - updater.json (Tauri desktop): ${baseUrl}/updater.json`)
+console.log(`  - version.json (Web): ${baseUrl}/version.json`)
+console.log(`  - Desktop downloads base: ${releaseUrl}`)
