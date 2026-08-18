@@ -3,6 +3,7 @@ dist
 *.local
 .env
 .DS_Store
+release-artifacts/
 
 # AI-generated design artifacts
 .superpowers/

@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ThemeToggle from './ThemeToggle.vue'
+import UpdateBanner from './UpdateBanner.vue'
 
 const router = useRouter()
 const showBackTop = ref(false)
@@ -44,6 +45,8 @@ onUnmounted(() => {
     <main class="mx-auto w-full max-w-[1800px] px-4 py-6 md:px-6 md:py-8">
       <slot />
     </main>
+
+    <UpdateBanner />
 
     <Transition name="fade">
       <button
