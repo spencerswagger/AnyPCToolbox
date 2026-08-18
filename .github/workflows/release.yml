@@ -9,91 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  publish-tauri:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            target: aarch64-apple-darwin
-          - platform: macos-latest
-            target: x86_64-apple-darwin
-          - platform: windows-latest
-            target: x86_64-pc-windows-msvc
-          - platform: windows-latest
-            target: aarch64-pc-windows-msvc
-          - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-          - platform: ubuntu-22.04-arm
-            target: aarch64-unknown-linux-gnu
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Build and upload Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ${{ github.ref_name }}
-          releaseDraft: true
-          target: ${{ matrix.target }}
-          tauriConfig: |
-            {
-              "build": {
-                "beforeDevCommand": "npm run dev",
-                "beforeBuildCommand": "npm run build",
-                "devUrl": "http://localhost:1420",
-                "frontendDist": "../dist"
-              },
-              "bundle": {
-                "active": true,
-                "icon": [
-                  "icons/32x32.png",
-                  "icons/128x128.png",
-                  "icons/128x128@2x.png",
-                  "icons/icon.icns",
-                  "icons/icon.ico"
-                ],
-                "targets": "all"
-              },
-              "app": {
-                "windows": [
-                  {
-                    "title": "AnyPCToolbox",
-                    "width": 800,
-                    "height": 600
-                  }
-                ]
-              }
-            }
-
-  upload-web:
-    needs: publish-tauri
+  release:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -112,10 +28,11 @@ jobs:
       - name: Archive web assets
         run: zip -r anypctoolbox-web-${{ github.ref_name }}.zip dist/
 
-      - name: Upload web assets to release
+      - name: Create release and upload assets
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ github.ref_name }}
+          draft: true
           files: anypctoolbox-web-${{ github.ref_name }}.zip
-          tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
