@@ -7,3 +7,4 @@ dist
 # AI-generated design artifacts
 .superpowers/
 .trae-html-share-packages/
+dist-version/
