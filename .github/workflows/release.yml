@@ -73,16 +73,29 @@ jobs:
         run: npm ci
 
       - name: Inject updater endpoint from GitHub variable
-        run: |
-          if [ -z "${UPDATER_BASE_URL}" ]; then
-            echo "::error::缺少 UPDATER_BASE_URL 仓库变量(下载站根目录，如 http://download.example.com/anypctoolbox/)"
-            exit 1
-          fi
-          BASE="$(printf '%s' "${UPDATER_BASE_URL}" | sed 's#/$##')"
-          sed -i "s#https://updates.anypctoolbox.example.com/updater.json#${BASE}/updater.json#" src-tauri/tauri.conf.json
-          grep -o '"endpoints".*updater.json' src-tauri/tauri.conf.json
         env:
           UPDATER_BASE_URL: ${{ vars.UPDATER_BASE_URL }}
+        run: |
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs"
+            const base = process.env.UPDATER_BASE_URL
+            if (!base) {
+              console.error("::error::缺少 UPDATER_BASE_URL 仓库变量(下载站根目录，如 http://download.example.com/anypctoolbox/)")
+              process.exit(1)
+            }
+            const file = "src-tauri/tauri.conf.json"
+            const endpoint = base.replace(/\/+$/, "") + "/updater.json"
+            const next = readFileSync(file, "utf8").replace(
+              "https://updates.anypctoolbox.example.com/updater.json",
+              endpoint,
+            )
+            if (next.indexOf(endpoint) < 0) {
+              console.error("::error::未找到占位 endpoint，无法注入")
+              process.exit(1)
+            }
+            writeFileSync(file, next)
+            console.log("endpoint -> " + endpoint)
+          '
 
       - name: Build and upload Tauri app
         uses: tauri-apps/tauri-action@v0
