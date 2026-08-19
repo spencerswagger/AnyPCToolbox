@@ -29,7 +29,8 @@ function syncFromValue(v: string): void {
   } else if (/^\d{4}00$/.test(v)) {
     selProvince.value = `${v.slice(0, 2)}0000`
     selCity.value = v
-    selDistrict.value = expandedCity.value = ''
+    selDistrict.value = ''
+    expandedCity.value = v
   } else {
     selProvince.value = `${v.slice(0, 2)}0000`
     selCity.value = `${v.slice(0, 4)}00`
@@ -95,7 +96,7 @@ function isExpanded(code: string): boolean {
   <div class="w-full">
     <!-- 当前选择路径 + 清除 -->
     <div class="mb-1.5 flex h-5 items-center justify-between gap-2 text-xs text-muted-foreground">
-      <span class="truncate" :class="displayText ? 'text-foreground' : ''">{{ displayText || '不限地区' }}</span>
+      <span class="min-w-0 flex-1 truncate" :class="displayText ? 'text-foreground' : ''">{{ displayText || '不限地区' }}</span>
       <button
         type="button"
         class="shrink-0 rounded px-1.5 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
@@ -107,7 +108,7 @@ function isExpanded(code: string): boolean {
 
     <!-- 常驻三列联动面板 -->
     <div class="flex gap-1.5 text-sm">
-      <div class="flex-1 overflow-hidden rounded-md border bg-background">
+      <div class="min-w-0 flex-1 overflow-hidden rounded-md border bg-background">
         <div class="h-5 border-b bg-accent/40 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           省份
         </div>
@@ -124,7 +125,7 @@ function isExpanded(code: string): boolean {
         </ul>
       </div>
 
-      <div class="flex-1 overflow-hidden rounded-md border bg-background">
+      <div class="min-w-0 flex-1 overflow-hidden rounded-md border bg-background">
         <div class="h-5 border-b bg-accent/40 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           {{ hasCity ? '城市' : '区县' }}
         </div>
@@ -148,7 +149,7 @@ function isExpanded(code: string): boolean {
         </div>
       </div>
 
-      <div class="flex-1 overflow-hidden rounded-md border bg-background">
+      <div class="min-w-0 flex-1 overflow-hidden rounded-md border bg-background">
         <div class="h-5 border-b bg-accent/40 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           区县
         </div>
