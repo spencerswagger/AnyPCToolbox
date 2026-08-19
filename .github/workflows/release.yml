@@ -171,7 +171,7 @@ jobs:
             echo "::error::缺少 UPDATER_BASE_URL 仓库变量，无法改写 updater.json 的下载地址"
             exit 1
           fi
-          node scripts/rewrite-updater-json.js latest.json updater.json "$UPDATER_BASE_URL"
+          node scripts/rewrite-updater-json.js latest.json updater.json "$UPDATER_BASE_URL" "$GITHUB_REF_NAME"
 
       - name: Upload updater.json
         env:

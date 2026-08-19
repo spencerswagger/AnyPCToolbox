@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 /**
- * 重写 tauri 桌面端更新清单(latest.json) 的各平台 url 为 baseurl + 文件名。
+ * 重写 tauri 桌面端更新清单(latest.json) 的各平台 url 为 baseurl + 版本号 + 文件名。
  *
  * 背景：tauri-action 生成的 latest.json 各平台 url 默认指向 GitHub Release，
- * 部署到自建下载站后需改为 baseurl 下的同名文件。
+ * 下载站采用 baseurl/<版本号>/<文件> 的目录结构，部署时需改写为：
+ *     <baseurl>/<版本>/<文件名>
  *
- * 用法：node scripts/rewrite-updater-json.js <input.json> <output.json> <baseurl>
+ * 用法：node scripts/rewrite-updater-json.js <input.json> <output.json> <baseurl> <version>
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 
-const [, , input, output, base] = process.argv
-if (!input || !output || !base) {
-  console.error('用法: node scripts/rewrite-updater-json.js <input.json> <output.json> <baseurl>')
+const [, , input, output, base, version] = process.argv
+if (!input || !output || !base || !version) {
+  console.error('用法: node scripts/rewrite-updater-json.js <input> <output> <baseurl> <version>')
   process.exit(1)
 }
 
@@ -23,6 +24,7 @@ if (!manifest.platforms) {
   process.exit(1)
 }
 
+let changed = 0
 for (const [plat, entry] of Object.entries(manifest.platforms)) {
   let file = ''
   try {
@@ -31,9 +33,9 @@ for (const [plat, entry] of Object.entries(manifest.platforms)) {
     console.warn(`[rewrite-updater-json] ${plat} url 解析失败，跳过: ${entry.url}`)
     continue
   }
-  entry.url = `${normalizedBase}${file}`
+  entry.url = `${normalizedBase}${version}/${file}`
+  changed++
 }
 
 writeFileSync(output, JSON.stringify(manifest, null, 2) + '\n')
-const keys = Object.keys(manifest.platforms)
-console.log(`[rewrite-updater-json] 已重写 ${keys.length} 个平台 url -> ${normalizedBase}`)
+console.log(`[rewrite-updater-json] 已重写 ${changed} 个平台 url -> ${normalizedBase}${version}/`)
