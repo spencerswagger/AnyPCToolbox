@@ -5,11 +5,10 @@ import { areas, provinceOptions, cityOptions, districtOptions } from '@/lib/area
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
-const open = ref(false)
 const selProvince = ref('')
 const selCity = ref('')
 const selDistrict = ref('')
-// 展开态：决定下一级显示哪一列
+// 展开态：决定当前鼠标/选择停在哪一级，驱动下一列显示
 const expandedProvince = ref('')
 const expandedCity = ref('')
 
@@ -40,11 +39,6 @@ function syncFromValue(v: string): void {
   expandedProvince.value = selProvince.value
 }
 
-// 面板不依赖全局点击监听；只在显式动作时关闭，杜绝点选上级行政区时误关面板
-function closePanel(): void {
-  open.value = false
-}
-
 const provinces = provinceOptions
 const cities = computed(() => cityOptions(expandedProvince.value))
 /** 是否有市级（直辖市/省直辖县级无市） */
@@ -68,9 +62,6 @@ const displayText = computed(() => {
   return parts.join(' / ')
 })
 
-function toggle(): void {
-  open.value = !open.value
-}
 function pickProvince(code: string): void {
   expandedProvince.value = code
   selProvince.value = code
@@ -86,12 +77,10 @@ function pickCity(code: string): void {
 function pickDistrict(code: string): void {
   selDistrict.value = code
   emit('update:modelValue', code)
-  open.value = false
 }
 function clearAll(): void {
   syncFromValue('')
   emit('update:modelValue', '')
-  open.value = false
 }
 
 function isSelected(code: string): boolean {
@@ -103,88 +92,81 @@ function isExpanded(code: string): boolean {
 </script>
 
 <template>
-  <div class="relative w-full">
-    <button
-      type="button"
-      class="flex h-8 w-full items-center justify-between gap-1 rounded-md border border-input bg-background px-2 text-sm outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring"
-      :class="open ? 'bg-accent/50' : ''"
-      @click.stop="toggle"
-    >
-      <span class="truncate text-left" :class="displayText ? 'text-foreground' : 'text-muted-foreground'">
-        {{ displayText || '不限地区' }}
-      </span>
-      <svg
-        class="shrink-0 transition-transform"
-        :class="open ? 'rotate-180' : ''"
-        xmlns="http://www.w3.org/2000/svg"
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="m6 9 6 6 6-6" />
-      </svg>
-    </button>
-
-    <div v-if="open" class="absolute left-0 top-full z-50 mt-1 flex overflow-hidden rounded-lg border bg-background shadow-md">
-      <ul class="max-h-64 w-36 overflow-y-auto">
-        <li
-          class="cursor-pointer px-3 py-1.5 text-sm outline-none"
-          :class="isSelected(p.code) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent/50'"
-          v-for="p in provinces"
-          :key="p.code"
-          @click="pickProvince(p.code)"
-        >
-          {{ p.name }}
-        </li>
-      </ul>
-
-      <ul v-if="expandedProvince" class="max-h-64 w-36 overflow-y-auto border-l">
-        <li
-          class="cursor-pointer px-3 py-1.5 text-sm outline-none"
-          :class="
-            isSelected(c.code) || isExpanded(c.code)
-              ? 'bg-accent text-accent-foreground'
-              : 'text-foreground hover:bg-accent/50'
-          "
-          v-for="c in secondColumn"
-          :key="c.code"
-          @click="c.isDistrict ? pickDistrict(c.code) : pickCity(c.code)"
-        >
-          {{ c.name }}
-        </li>
-      </ul>
-
-      <ul v-if="thirdColumn.length" class="max-h-64 w-36 overflow-y-auto border-l">
-        <li
-          class="cursor-pointer px-3 py-1.5 text-sm outline-none"
-          :class="isSelected(d.code) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent/50'"
-          v-for="d in thirdColumn"
-          :key="d.code"
-          @click="pickDistrict(d.code)"
-        >
-          {{ d.name }}
-        </li>
-      </ul>
-
+  <div class="w-full">
+    <!-- 当前选择路径 + 清除 -->
+    <div class="mb-1.5 flex h-5 items-center justify-between gap-2 text-xs text-muted-foreground">
+      <span class="truncate" :class="displayText ? 'text-foreground' : ''">{{ displayText || '不限地区' }}</span>
       <button
         type="button"
-        class="cursor-pointer whitespace-nowrap px-3 py-1.5 text-sm text-muted-foreground outline-none hover:bg-accent/50 hover:text-foreground"
+        class="shrink-0 rounded px-1.5 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         @click="clearAll"
       >
-        不限地区
+        清除
       </button>
-      <button
-        type="button"
-        class="cursor-pointer whitespace-nowrap px-3 py-1.5 text-sm text-muted-foreground outline-none hover:bg-accent/50 hover:text-foreground"
-        @click="closePanel"
-      >
-        收起
-      </button>
+    </div>
+
+    <!-- 常驻三列联动面板 -->
+    <div class="flex gap-1.5 text-sm">
+      <div class="flex-1 overflow-hidden rounded-md border bg-background">
+        <div class="h-5 border-b bg-accent/40 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          省份
+        </div>
+        <ul class="max-h-44 overflow-y-auto py-0.5">
+          <li
+            class="cursor-pointer truncate px-2 py-1 outline-none"
+            :class="isSelected(p.code) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent/50'"
+            v-for="p in provinces"
+            :key="p.code"
+            @click="pickProvince(p.code)"
+          >
+            {{ p.name }}
+          </li>
+        </ul>
+      </div>
+
+      <div class="flex-1 overflow-hidden rounded-md border bg-background">
+        <div class="h-5 border-b bg-accent/40 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          {{ hasCity ? '城市' : '区县' }}
+        </div>
+        <ul v-if="expandedProvince" class="max-h-44 overflow-y-auto py-0.5">
+          <li
+            class="cursor-pointer truncate px-2 py-1 outline-none"
+            :class="
+              isSelected(c.code) || isExpanded(c.code)
+                ? 'bg-accent text-accent-foreground'
+                : 'text-foreground hover:bg-accent/50'
+            "
+            v-for="c in secondColumn"
+            :key="c.code"
+            @click="c.isDistrict ? pickDistrict(c.code) : pickCity(c.code)"
+          >
+            {{ c.name }}
+          </li>
+        </ul>
+        <div v-else class="flex h-[calc(100%-1.25rem)] min-h-8 items-center justify-center text-xs text-muted-foreground">
+          请先选择省份
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-hidden rounded-md border bg-background">
+        <div class="h-5 border-b bg-accent/40 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          区县
+        </div>
+        <ul v-if="thirdColumn.length" class="max-h-44 overflow-y-auto py-0.5">
+          <li
+            class="cursor-pointer truncate px-2 py-1 outline-none"
+            :class="isSelected(d.code) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent/50'"
+            v-for="d in thirdColumn"
+            :key="d.code"
+            @click="pickDistrict(d.code)"
+          >
+            {{ d.name }}
+          </li>
+        </ul>
+        <div v-else class="flex h-[calc(100%-1.25rem)] min-h-8 items-center justify-center text-xs text-muted-foreground">
+          请先选择城市
+        </div>
+      </div>
     </div>
   </div>
 </template>

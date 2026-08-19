@@ -456,10 +456,12 @@ function removeEntry(index: number): void {
                 />
               </div>
             </label>
-            <label class="flex items-center gap-3">
-              <span class="w-12 shrink-0 text-muted-foreground">地区</span>
-              <AreaCascader v-model="genArea" />
-            </label>
+            <div class="flex items-start gap-3">
+              <span class="w-12 shrink-0 pt-5 text-muted-foreground">地区</span>
+              <div class="flex-1">
+                <AreaCascader v-model="genArea" />
+              </div>
+            </div>
           </div>
           <div class="mt-5 flex items-center justify-end gap-2">
             <button
