@@ -2,6 +2,8 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ThemeToggle from './ThemeToggle.vue'
+import UpdateBanner from './UpdateBanner.vue'
+import UpdateManager from './UpdateManager.vue'
 
 const router = useRouter()
 const showBackTop = ref(false)
@@ -41,6 +43,7 @@ onUnmounted(() => {
         </div>
       </div>
     </header>
+    <UpdateBanner />
     <main class="mx-auto w-full max-w-[1800px] px-4 py-6 md:px-6 md:py-8">
       <slot />
     </main>
@@ -58,6 +61,7 @@ onUnmounted(() => {
         </svg>
       </button>
     </Transition>
+    <UpdateManager />
   </div>
 </template>
 
