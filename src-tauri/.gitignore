@@ -1,6 +1,6 @@
 # Tauri
-src-tauri/target/
-src-tauri/gen/
+/target
+/gen/schemas
 
 # Node
 node_modules/
