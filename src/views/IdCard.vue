@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { toast } from 'vue-sonner'
+import { useToaster } from '@/lib/ui/use-toast'
 import { normalizeId, parseId, generateIds, type IdInfo, type Sex } from '@/lib/idcard'
 import { areas, areaUpdatedAt } from '@/lib/areaData'
 import AreaCascader from '@/components/AreaCascader.vue'
@@ -74,9 +74,10 @@ const stats = computed(() => {
   return { total: entries.value.length, valid, invalid: entries.value.length - valid }
 })
 
-/** 顶部通知（vue-sonner toast） */
+/** 顶部通知（shadcn toast） */
+const { toast } = useToaster()
 function flashStatus(msg: string): void {
-  toast(msg)
+  toast(undefined, msg)
 }
 
 /** 输入框随内容行数自适应高度 */
