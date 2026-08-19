@@ -164,3 +164,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$GITHUB_REF_NAME" updater.json --clobber
+
+      # release 只保留部署下载站所需内容；latest.json(指向 GitHub 的原始清单) 已由 updater.json 取代
+      - name: Remove redundant latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete-asset "$GITHUB_REF_NAME" latest.json --yes
