@@ -94,21 +94,29 @@ function flashStatus(msg: string): void {
   }, 3000)
 }
 
-/** 入列（去重）并选中第一个 */
-function addIds(ids: string[], originals: Map<string, string>): void {
-  let first = ''
+/** 入列（去重）并选中第一个。去重按原始输入字符串；15 位升位可能与 18 位输入归一化相同，但视为两条不同条目。 */
+function addIds(
+  items: Array<{ id: string; original: string }>,
+  source: 'submit' | 'generate',
+): void {
+  let firstId = ''
   let added = 0
   let dup = 0
-  for (const id of ids) {
-    if (!first) first = id
-    if (entries.value.some((e) => e.id === id)) {
+  for (const it of items) {
+    if (!firstId) firstId = it.id
+    // 去重依据：按 original（提交）或按 id（生成，生成不会重复 original）
+    const exists =
+      source === 'submit'
+        ? entries.value.some((e) => e.original === it.original)
+        : entries.value.some((e) => e.id === it.id)
+    if (exists) {
       dup++
       continue
     }
-    entries.value.push({ id, original: originals.get(id) ?? id, addedAt: Date.now() })
+    entries.value.push({ id: it.id, original: it.original, addedAt: Date.now() })
     added++
   }
-  selectedId.value = first
+  selectedId.value = firstId
   flashStatus(`新增 ${added} 条${dup ? `，已存在 ${dup} 条` : ''}`)
 }
 
@@ -118,15 +126,12 @@ function handleSubmit(): void {
     .map((s) => s.trim())
     .filter(Boolean)
   if (!lines.length) return
-  const ids: string[] = []
-  const originals = new Map<string, string>()
+  const items: Array<{ id: string; original: string }> = []
   for (const line of lines) {
     const norm = normalizeId(line)
-    const id = norm.id ?? line
-    if (!ids.includes(id)) ids.push(id)
-    originals.set(id, line)
+    items.push({ id: norm.id ?? line, original: line })
   }
-  addIds(ids, originals)
+  addIds(items, 'submit')
   input.value = ''
 }
 
@@ -146,7 +151,10 @@ function handleGenerate(): void {
     flashStatus('生成失败：该地区无可用区划码')
     return
   }
-  addIds(ids, new Map(ids.map((id) => [id, id])))
+  addIds(
+    ids.map((id) => ({ id, original: id })),
+    'generate',
+  )
 }
 
 async function copyText(text: string, msg: string): Promise<void> {
