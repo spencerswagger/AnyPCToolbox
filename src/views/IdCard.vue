@@ -18,8 +18,15 @@ const router = useRouter()
 const input = ref('')
 const entries = ref<IdEntry[]>(loadEntries())
 const selectedId = ref('')
-const status = ref('')
 const showGenerate = ref(false)
+
+// 轻量通知（右上角 toast）
+interface ToastItem {
+  id: number
+  msg: string
+}
+const toasts = ref<ToastItem[]>([])
+let toastSeq = 0
 
 // 批量生成配置（地区为空 = 全国随机）
 const genCount = ref(10)
@@ -74,12 +81,12 @@ const stats = computed(() => {
   return { total: entries.value.length, valid, invalid: entries.value.length - valid }
 })
 
-let statusTimer: ReturnType<typeof setTimeout> | undefined
+/** 顶部通知 */
 function flashStatus(msg: string): void {
-  status.value = msg
-  clearTimeout(statusTimer)
-  statusTimer = setTimeout(() => {
-    status.value = ''
+  const id = ++toastSeq
+  toasts.value.push({ id, msg })
+  setTimeout(() => {
+    toasts.value = toasts.value.filter((t) => t.id !== id)
   }, 3000)
 }
 
@@ -95,6 +102,9 @@ function resetGrow(): void {
   if (el) el.style.height = 'auto'
 }
 
+/** 身份证号列表上限 */
+const MAX_ENTRIES = 10000
+
 /** 入列（去重）并选中第一个。去重按原始输入字符串；15 位升位可能与 18 位输入归一化相同，但视为两条不同条目。 */
 function addIds(
   items: Array<{ id: string; original: string }>,
@@ -103,6 +113,7 @@ function addIds(
   let firstId = ''
   let added = 0
   let dup = 0
+  let limited = 0
   for (const it of items) {
     if (!firstId) firstId = it.id
     // 去重依据：按 original（提交）或按 id（生成，生成不会重复 original）
@@ -114,11 +125,19 @@ function addIds(
       dup++
       continue
     }
+    if (entries.value.length >= MAX_ENTRIES) {
+      limited++
+      continue
+    }
     entries.value.push({ id: it.id, original: it.original, addedAt: Date.now() })
     added++
   }
   selectedId.value = firstId
-  flashStatus(`新增 ${added} 条${dup ? `，已存在 ${dup} 条` : ''}`)
+  const parts = []
+  if (added) parts.push(`新增 ${added} 条`)
+  if (dup) parts.push(`已存在 ${dup} 条`)
+  if (limited) parts.push(`列表已达 ${MAX_ENTRIES} 条上限，跳过 ${limited} 条`)
+  flashStatus(parts.length ? parts.join('，') : '无新增')
 }
 
 function handleSubmit(): void {
@@ -401,9 +420,6 @@ function removeEntry(index: number): void {
     <!-- 底部状态栏 -->
     <div class="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
       <span>行政区划数据更新至 {{ areaUpdatedAt }}</span>
-      <span class="order-last w-full text-center sm:order-none sm:w-auto sm:flex-1" :class="status ? 'text-foreground' : ''">
-        {{ status }}
-      </span>
       <span>共 {{ stats.total }} · 有效 {{ stats.valid }} · 无效 {{ stats.invalid }}</span>
     </div>
 
@@ -422,7 +438,7 @@ function removeEntry(index: number): void {
                 v-model.number="genCount"
                 type="number"
                 min="1"
-                max="500"
+                max="10000"
                 class="h-8 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
@@ -477,6 +493,21 @@ function removeEntry(index: number): void {
             </button>
           </div>
         </div>
+      </div>
+    </Teleport>
+
+    <!-- 顶部通知 -->
+    <Teleport to="body">
+      <div class="pointer-events-none fixed right-4 top-4 z-[60] flex w-72 flex-col gap-2">
+        <TransitionGroup name="toast">
+          <div
+            v-for="t in toasts"
+            :key="t.id"
+            class="pointer-events-auto rounded-lg border bg-card px-4 py-2.5 text-sm shadow-lg"
+          >
+            {{ t.msg }}
+          </div>
+        </TransitionGroup>
       </div>
     </Teleport>
   </div>
