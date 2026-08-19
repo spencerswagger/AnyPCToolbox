@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { normalizeId, parseId, generateIds, type IdInfo, type Sex } from '@/lib/idcard'
 import { areas, areaUpdatedAt } from '@/lib/areaData'
 import AreaCascader from '@/components/AreaCascader.vue'
@@ -19,14 +20,6 @@ const input = ref('')
 const entries = ref<IdEntry[]>(loadEntries())
 const selectedId = ref('')
 const showGenerate = ref(false)
-
-// 轻量通知（右上角 toast）
-interface ToastItem {
-  id: number
-  msg: string
-}
-const toasts = ref<ToastItem[]>([])
-let toastSeq = 0
 
 // 批量生成配置（地区为空 = 全国随机）
 const genCount = ref(10)
@@ -81,13 +74,9 @@ const stats = computed(() => {
   return { total: entries.value.length, valid, invalid: entries.value.length - valid }
 })
 
-/** 顶部通知 */
+/** 顶部通知（vue-sonner toast） */
 function flashStatus(msg: string): void {
-  const id = ++toastSeq
-  toasts.value.push({ id, msg })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }, 3000)
+  toast(msg)
 }
 
 /** 输入框随内容行数自适应高度 */
@@ -493,21 +482,6 @@ function removeEntry(index: number): void {
             </button>
           </div>
         </div>
-      </div>
-    </Teleport>
-
-    <!-- 顶部通知 -->
-    <Teleport to="body">
-      <div class="pointer-events-none fixed right-4 top-4 z-[60] flex w-72 flex-col gap-2">
-        <TransitionGroup name="toast">
-          <div
-            v-for="t in toasts"
-            :key="t.id"
-            class="pointer-events-auto rounded-lg border bg-card px-4 py-2.5 text-sm shadow-lg"
-          >
-            {{ t.msg }}
-          </div>
-        </TransitionGroup>
       </div>
     </Teleport>
   </div>
