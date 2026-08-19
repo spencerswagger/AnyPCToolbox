@@ -19,19 +19,17 @@ if (!/^v\d+\.\d+\.\d+$/.test(tag)) {
 }
 const version = tag.replace(/^v/, '')
 
+// 版本以运行时传入的 tag 为准（GitHub Action 触发时由 GITHUB_REF_NAME 提供），
+// 不再强制与 package.json / tauri.conf.json 一致，只打印差异作为提示，不阻断发布。
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 const tauriConf = JSON.parse(readFileSync(resolve(root, 'src-tauri/tauri.conf.json'), 'utf8'))
 
-for (const [file, v] of [
+for (const [label, v] of [
   ['package.json', pkg.version],
   ['src-tauri/tauri.conf.json', tauriConf.version],
 ]) {
   if (v !== version) {
-    console.error(
-      `[generate-update-artifacts] 版本不一致: tag=${version}，但 ${file} 中为 ${v}。` +
-        '发版前请同步更新这两处版本号。',
-    )
-    process.exit(1)
+    console.warn(`[generate-update-artifacts] 提示: tag=${version}，但 ${label} 中为 ${v}（以 tag 为准）`)
   }
 }
 
