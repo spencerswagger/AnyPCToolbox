@@ -176,8 +176,14 @@ export function generateIds(options: GenerateOptions, areas: AreaMap, now: Date 
   )
   if (options.areaCode) {
     const ac = options.areaCode
-    const prefixLen = ac.length >= 6 ? 6 : ac.length >= 4 ? 4 : 2
-    codes = codes.filter((c) => c.startsWith(ac.slice(0, prefixLen)))
+    // 按码的行政级别推导前缀长度：省码(XX0000)→2位，市码(XXXX00)→4位，区县码→6位
+    const prefix =
+      ac.length >= 6 && ac.endsWith('0000')
+        ? ac.slice(0, 2)
+        : ac.length >= 6 && ac.endsWith('00')
+          ? ac.slice(0, 4)
+          : ac.slice(0, 6)
+    codes = codes.filter((c) => c.startsWith(prefix))
   }
   if (codes.length === 0) return []
 

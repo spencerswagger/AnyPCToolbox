@@ -1,7 +1,7 @@
 {
   "_source": "https://github.com/mumuy/idcard/blob/main/src/module/data/china.js",
   "_license": "MIT",
-  "_updatedAt": "2026-08-19",
+  "_updatedAt": "2026-05-21",
   "areas": {
     "110000": "北京市",
     "110100": "市辖区",

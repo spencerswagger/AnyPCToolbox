@@ -21,7 +21,7 @@ const tools = [
     name: '身份证号工具',
     description: '校验位校验、发证地与生日性别年龄解析、批量生成与复制',
     route: '/idcard',
-    tag: 'v1.1',
+    tag: 'v1.0',
   },
 ]
 </script>

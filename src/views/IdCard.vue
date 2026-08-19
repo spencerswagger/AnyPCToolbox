@@ -2,7 +2,8 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { normalizeId, parseId, generateIds, type IdInfo, type Sex } from '@/lib/idcard'
-import { areas, areaUpdatedAt, provinceOptions, cityOptions, districtOptions } from '@/lib/areaData'
+import { areas, areaUpdatedAt } from '@/lib/areaData'
+import AreaCascader from '@/components/AreaCascader.vue'
 
 interface IdEntry {
   /** 18 位号码；无法归一化的输入保留原文 */
@@ -20,14 +21,12 @@ const selectedId = ref('')
 const status = ref('')
 const showGenerate = ref(false)
 
-// 批量生成配置（全部可留空 = 随机）
+// 批量生成配置（地区为空 = 全国随机）
 const genCount = ref(10)
 const genSex = ref<'' | Sex>('')
 const genMinAge = ref('')
 const genMaxAge = ref('')
-const genProvince = ref('')
-const genCity = ref('')
-const genDistrict = ref('')
+const genArea = ref('')
 
 function loadEntries(): IdEntry[] {
   try {
@@ -72,17 +71,6 @@ const stats = computed(() => {
   let valid = 0
   for (const e of entries.value) if (infos.value.get(e.id)?.valid) valid++
   return { total: entries.value.length, valid, invalid: entries.value.length - valid }
-})
-
-const genCities = computed(() => cityOptions(genProvince.value))
-const genDistricts = computed(() => districtOptions(genProvince.value, genCity.value || undefined))
-
-watch(genProvince, () => {
-  genCity.value = ''
-  genDistrict.value = ''
-})
-watch(genCity, () => {
-  genDistrict.value = ''
 })
 
 let statusTimer: ReturnType<typeof setTimeout> | undefined
@@ -136,25 +124,25 @@ function handleSubmit(): void {
 }
 
 function handleGenerate(): void {
-  const areaCode = genDistrict.value || genCity.value || genProvince.value || undefined
   const ids = generateIds(
     {
       count: Number(genCount.value) || 10,
       sex: genSex.value || undefined,
       minAge: genMinAge.value === '' ? undefined : Number(genMinAge.value),
       maxAge: genMaxAge.value === '' ? undefined : Number(genMaxAge.value),
-      areaCode,
+      areaCode: genArea.value || undefined,
     },
     areas,
   )
   if (!ids.length) {
-    flashStatus('生成失败：该地区无可用区划码')
+    flashStatus('生成失败：该地区无可用的区划码')
     return
   }
   addIds(
     ids.map((id) => ({ id, original: id })),
     'generate',
   )
+  showGenerate.value = false
 }
 
 async function copyText(text: string, msg: string): Promise<void> {
@@ -186,7 +174,7 @@ function clearAll(): void {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-6">
     <!-- 顶栏 -->
     <div class="flex items-center gap-2">
       <button
@@ -198,6 +186,12 @@ function clearAll(): void {
       <span class="text-muted-foreground">|</span>
       <h2 class="text-lg font-semibold">身份证号工具</h2>
       <div class="ml-auto flex items-center gap-2">
+        <button
+          class="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring outline-none"
+          @click="showGenerate = true"
+        >
+          批量生成
+        </button>
         <button
           class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring outline-none"
           @click="copyAll"
@@ -213,117 +207,26 @@ function clearAll(): void {
       </div>
     </div>
 
-    <!-- 输入区（居中卡片） -->
-    <div class="mx-auto w-full max-w-2xl rounded-lg border bg-card">
-      <div class="border-b px-3 py-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        ⌨️ 输入身份证号
-      </div>
-      <div class="p-3">
+    <!-- 输入区（居中式，参考对话首页） -->
+    <div class="mx-auto max-w-xl pt-2">
+      <div class="flex flex-col">
         <textarea
           v-model="input"
           rows="3"
           placeholder="输入身份证号，一行一个（支持 15 位自动转 18 位），回车确认，Shift+Enter 换行..."
           spellcheck="false"
           autocomplete="off"
-          class="w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          class="w-full resize-none rounded-2xl bg-accent/60 px-4 py-3 font-mono text-sm leading-relaxed outline-none placeholder:text-muted-foreground focus:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
           @keydown.enter.exact.prevent="handleSubmit"
         />
-        <div class="mt-2 flex items-center gap-2">
+        <div class="mt-3 flex items-center gap-3">
           <button
-            class="inline-flex flex-1 items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring outline-none"
+            class="inline-flex items-center justify-center rounded-full bg-primary px-6 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring outline-none"
             @click="handleSubmit"
           >
             确认
           </button>
-          <button
-            class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring outline-none"
-            @click="showGenerate = !showGenerate"
-          >
-            批量生成
-          </button>
-        </div>
-
-        <!-- 批量生成配置（均可留空 = 随机） -->
-        <div v-if="showGenerate" class="mt-3 space-y-2 rounded-md border bg-background p-3">
-          <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <label class="flex items-center gap-2 text-sm">
-              <span class="w-14 shrink-0 text-muted-foreground">数量</span>
-              <input
-                v-model.number="genCount"
-                type="number"
-                min="1"
-                max="500"
-                class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <span class="w-14 shrink-0 text-muted-foreground">性别</span>
-              <select
-                v-model="genSex"
-                class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">随机</option>
-                <option value="男">男</option>
-                <option value="女">女</option>
-              </select>
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <span class="w-14 shrink-0 text-muted-foreground">年龄</span>
-              <div class="flex flex-1 items-center gap-1">
-                <input
-                  v-model="genMinAge"
-                  type="number"
-                  placeholder="最小"
-                  class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                />
-                <span class="text-muted-foreground">-</span>
-                <input
-                  v-model="genMaxAge"
-                  type="number"
-                  placeholder="最大"
-                  class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <span class="w-14 shrink-0 text-muted-foreground">省份</span>
-              <select
-                v-model="genProvince"
-                class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">全国随机</option>
-                <option v-for="p in provinceOptions" :key="p.code" :value="p.code">{{ p.name }}</option>
-              </select>
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <span class="w-14 shrink-0 text-muted-foreground">城市</span>
-              <select
-                v-model="genCity"
-                :disabled="!genProvince"
-                class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-              >
-                <option value="">{{ genCities.length ? '随机' : '全部' }}</option>
-                <option v-for="c in genCities" :key="c.code" :value="c.code">{{ c.name }}</option>
-              </select>
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <span class="w-14 shrink-0 text-muted-foreground">区县</span>
-              <select
-                v-model="genDistrict"
-                :disabled="!genProvince"
-                class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-              >
-                <option value="">随机</option>
-                <option v-for="d in genDistricts" :key="d.code" :value="d.code">{{ d.name }}</option>
-              </select>
-            </label>
-          </div>
-          <button
-            class="inline-flex w-full items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring outline-none"
-            @click="handleGenerate"
-          >
-            生成
-          </button>
+          <span class="text-xs text-muted-foreground">回车快速提交</span>
         </div>
       </div>
     </div>
@@ -339,7 +242,7 @@ function clearAll(): void {
           v-if="!entries.length"
           class="flex min-h-[240px] flex-1 items-center justify-center p-4 text-sm text-muted-foreground"
         >
-          暂无数据，请在上方输入或生成
+          暂无数据，请在顶部输入或生成
         </div>
         <ul v-else class="max-h-[480px] divide-y overflow-y-auto">
           <li v-for="e in entries" :key="e.original">
@@ -453,11 +356,83 @@ function clearAll(): void {
 
     <!-- 底部状态栏 -->
     <div class="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
-      <span>📦 内置区划数据 · {{ areaUpdatedAt }}</span>
+      <span>行政区划数据更新至 {{ areaUpdatedAt }}</span>
       <span class="order-last w-full text-center sm:order-none sm:w-auto sm:flex-1" :class="status ? 'text-foreground' : ''">
         {{ status }}
       </span>
       <span>共 {{ stats.total }} · 有效 {{ stats.valid }} · 无效 {{ stats.invalid }}</span>
     </div>
+
+    <!-- 批量生成弹窗 -->
+    <Teleport to="body">
+      <div
+        v-if="showGenerate"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+        @click.self="showGenerate = false"
+      >
+        <div class="w-full max-w-md rounded-xl border bg-card p-5 shadow-lg">
+          <h3 class="mb-4 text-base font-semibold">批量生成身份证号</h3>
+          <div class="space-y-3 text-sm">
+            <label class="flex items-center gap-3">
+              <span class="w-12 shrink-0 text-muted-foreground">数量</span>
+              <input
+                v-model.number="genCount"
+                type="number"
+                min="1"
+                max="500"
+                class="h-8 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+            <label class="flex items-center gap-3">
+              <span class="w-12 shrink-0 text-muted-foreground">性别</span>
+              <select
+                v-model="genSex"
+                class="h-8 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">随机</option>
+                <option value="男">男</option>
+                <option value="女">女</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-3">
+              <span class="w-12 shrink-0 text-muted-foreground">年龄</span>
+              <div class="flex flex-1 items-center gap-2">
+                <input
+                  v-model="genMinAge"
+                  type="number"
+                  placeholder="最小"
+                  class="h-8 w-full rounded-md border border-input bg-background px-2 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <span class="text-muted-foreground">-</span>
+                <input
+                  v-model="genMaxAge"
+                  type="number"
+                  placeholder="最大"
+                  class="h-8 w-full rounded-md border border-input bg-background px-2 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+            </label>
+            <label class="flex items-center gap-3">
+              <span class="w-12 shrink-0 text-muted-foreground">地区</span>
+              <AreaCascader v-model="genArea" />
+            </label>
+          </div>
+          <div class="mt-5 flex items-center justify-end gap-2">
+            <button
+              class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring outline-none"
+              @click="showGenerate = false"
+            >
+              取消
+            </button>
+            <button
+              class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring outline-none"
+              @click="handleGenerate"
+            >
+              生成
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
