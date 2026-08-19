@@ -20,11 +20,12 @@ export interface AreaOption {
   name: string
 }
 
-/** 省级选项（含港澳台） */
+/** 省级选项（含港澳台）。数据源中 710000 与 830000 均为"台湾省"，按名称去重只保留行政区划标准编码(710000) */
 export const provinceOptions: AreaOption[] = Object.entries(areas)
   .filter(([code, name]) => /^\d{2}0000$/.test(code) && !PLACEHOLDER_NAMES.has(name))
   .map(([code, name]) => ({ code, name }))
   .sort((a, b) => a.code.localeCompare(b.code))
+  .filter((opt, i, arr) => arr.findIndex((o) => o.name === opt.name) === i)
 
 /** 市级选项；直辖市/省直辖县返回空数组（区县直接挂在省下） */
 export function cityOptions(provinceCode: string): AreaOption[] {

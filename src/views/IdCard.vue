@@ -412,7 +412,6 @@ function removeEntry(index: number): void {
       <div
         v-if="showGenerate"
         class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
-        @click.self="showGenerate = false"
       >
         <div class="w-full max-w-md rounded-xl border bg-card p-5 shadow-lg">
           <h3 class="mb-4 text-base font-semibold">批量生成身份证号</h3>
