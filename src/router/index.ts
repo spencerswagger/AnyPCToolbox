@@ -19,6 +19,11 @@ const router = createRouter({
       name: 'json',
       component: () => import('@/views/Json.vue'),
     },
+    {
+      path: '/idcard',
+      name: 'idcard',
+      component: () => import('@/views/IdCard.vue'),
+    },
   ],
 })
 

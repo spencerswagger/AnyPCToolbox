@@ -141,3 +141,24 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* vue-sonner toast 与项目主题协调、跟随暗色 */
+[data-sonner-toaster] {
+  font-family: inherit;
+}
+[data-sonner-toast] {
+  --normal-bg: hsl(var(--card));
+  --normal-text: hsl(var(--card-foreground));
+  --normal-border: hsl(var(--border));
+  --border: 1px solid hsl(var(--border));
+  --width: 340px;
+  border-color: hsl(var(--border)) !important;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+[data-sonner-toast][data-styled='true'] {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}
+[data-sonner-toast] [data-title] {
+  color: hsl(var(--card-foreground));
+}
