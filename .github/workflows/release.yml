@@ -9,30 +9,19 @@ permissions:
   contents: write
 
 jobs:
-  # 1. 生成 version.json 并创建 draft Release（后续 job 向同一 draft 追加制品）
-  generate-updater-json:
+  # 1. 先创建 draft Release，避免各 job 并发创建竞态；后续 job 向同一 draft 追加制品
+  create-draft-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Generate version.json
-        run: node scripts/generate-update-artifacts.js "${GITHUB_REF_NAME}"
-
-      - name: Upload version.json
+      - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           draft: true
-          files: dist-version/version.json
 
   # 2. 六平台桌面构建 + Updater 签名
   publish-tauri:
-    needs: generate-updater-json
+    needs: create-draft-release
     strategy:
       fail-fast: false
       matrix:
@@ -85,14 +74,15 @@ jobs:
 
       - name: Inject updater endpoint from GitHub variable
         run: |
-          if [ -z "${UPDATER_ENDPOINT}" ]; then
-            echo "::error::缺少 UPDATER_ENDPOINT 仓库变量(Register a GitHub Actions Variable)，桌面端将无法获取更新地址"
+          if [ -z "${UPDATER_BASE_URL}" ]; then
+            echo "::error::缺少 UPDATER_BASE_URL 仓库变量(下载站根目录，如 http://download.example.com/anypctoolbox/)"
             exit 1
           fi
-          sed -i "s#https://updates.anypctoolbox.example.com/updater.json#${UPDATER_ENDPOINT}#" src-tauri/tauri.conf.json
+          BASE="$(printf '%s' "${UPDATER_BASE_URL}" | sed 's#/$##')"
+          sed -i "s#https://updates.anypctoolbox.example.com/updater.json#${BASE}/updater.json#" src-tauri/tauri.conf.json
           grep -o '"endpoints".*updater.json' src-tauri/tauri.conf.json
         env:
-          UPDATER_ENDPOINT: ${{ vars.UPDATER_ENDPOINT }}
+          UPDATER_BASE_URL: ${{ vars.UPDATER_BASE_URL }}
 
       - name: Build and upload Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -107,9 +97,9 @@ jobs:
           includeUpdaterJson: true
           args: ${{ matrix.args }}
 
-  # 3. Web 静态资源打包上传
+  # 3. Web 静态资源打包上传（version.json 一并打进去，release 不再单独上传）
   upload-web:
-    needs: generate-updater-json
+    needs: create-draft-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,6 +115,11 @@ jobs:
       - name: Build web
         run: npm run build
 
+      - name: Generate version.json into web dist
+        run: |
+          node scripts/generate-update-artifacts.js "${GITHUB_REF_NAME}"
+          cp dist-version/version.json dist/version.json
+
       - name: Package web dist
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -137,3 +132,35 @@ jobs:
           tag_name: ${{ github.ref_name }}
           draft: true
           files: anypctoolbox-web-v*.zip
+
+  # 4. 重写桌面端 updater.json 的各平台 url 为 baseurl + 文件名，并上传到 release
+  finalize-updater-json:
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download "$GITHUB_REF_NAME" --pattern 'latest.json' --clobber
+
+      - name: Rewrite updater.json URLs
+        env:
+          UPDATER_BASE_URL: ${{ vars.UPDATER_BASE_URL }}
+        run: |
+          if [ -z "${UPDATER_BASE_URL}" ]; then
+            echo "::error::缺少 UPDATER_BASE_URL 仓库变量，无法改写 updater.json 的下载地址"
+            exit 1
+          fi
+          node scripts/rewrite-updater-json.js latest.json updater.json "$UPDATER_BASE_URL"
+
+      - name: Upload updater.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" updater.json --clobber
