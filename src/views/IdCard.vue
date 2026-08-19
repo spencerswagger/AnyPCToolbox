@@ -146,9 +146,16 @@ function handleSubmit(): void {
 }
 
 function handleGenerate(): void {
+  let count = Math.floor(Number(genCount.value)) || 10
+  const clamped = count < 1 ? 1 : Math.min(10000, count)
+  if (clamped !== count) {
+    genCount.value = clamped
+    count = clamped
+    flashStatus(`数量超出上限，已调整为 ${clamped} 条`)
+  }
   const ids = generateIds(
     {
-      count: Number(genCount.value) || 10,
+      count,
       sex: genSex.value || undefined,
       minAge: genMinAge.value === '' ? undefined : Number(genMinAge.value),
       maxAge: genMaxAge.value === '' ? undefined : Number(genMaxAge.value),
