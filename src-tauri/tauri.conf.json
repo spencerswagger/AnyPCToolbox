@@ -24,8 +24,18 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://updates.anypctoolbox.example.com/updater.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE0QTBGNDYyNzMxRDlBODQKUldTRW1oMXpZdlNncEo5WCt3M1dnRHk1Q0p0YUtMdlVzbzBRT0NXNWZrWW1Nb2ZObTNxYVV5N1kK",
+      "dialog": false
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",

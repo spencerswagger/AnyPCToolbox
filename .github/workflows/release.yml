@@ -9,7 +9,30 @@ permissions:
   contents: write
 
 jobs:
+  # 1. 生成 version.json 并创建 draft Release（后续 job 向同一 draft 追加制品）
+  generate-updater-json:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate version.json
+        run: node scripts/generate-update-artifacts.js "${GITHUB_REF_NAME}"
+
+      - name: Upload version.json
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: dist-version/version.json
+
+  # 2. 六平台桌面构建 + Updater 签名
   publish-tauri:
+    needs: generate-updater-json
     strategy:
       fail-fast: false
       matrix:
@@ -64,8 +87,42 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: ${{ github.ref_name }}
           releaseDraft: true
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  # 3. Web 静态资源打包上传
+  upload-web:
+    needs: generate-updater-json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web
+        run: npm run build
+
+      - name: Package web dist
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd dist
+          zip -r "../anypctoolbox-web-v${VERSION}.zip" .
+
+      - name: Upload web zip
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: anypctoolbox-web-v*.zip
