@@ -29,7 +29,7 @@
       "endpoints": [
         "https://updates.anypctoolbox.example.com/updater.json"
       ],
-      "pubkey": "REPLACE_WITH_TAURI_UPDATER_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE0QTBGNDYyNzMxRDlBODQKUldTRW1oMXpZdlNncEo5WCt3M1dnRHk1Q0p0YUtMdlVzbzBRT0NXNWZrWW1Nb2ZObTNxYVV5N1kK",
       "dialog": false
     }
   },
