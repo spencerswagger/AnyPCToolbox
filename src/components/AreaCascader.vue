@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { areas, provinceOptions, cityOptions, districtOptions } from '@/lib/areaData'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
-const root = ref<HTMLElement | null>(null)
 const open = ref(false)
 const selProvince = ref('')
 const selCity = ref('')
@@ -41,12 +40,10 @@ function syncFromValue(v: string): void {
   expandedProvince.value = selProvince.value
 }
 
-// 点击组件外部时关闭（面板内部点击不影响展开态，保证省→市→区可连续选择）
-function onOutside(e: MouseEvent): void {
-  if (open.value && root.value && !root.value.contains(e.target as Node)) open.value = false
+// 面板不依赖全局点击监听；只在显式动作时关闭，杜绝点选上级行政区时误关面板
+function closePanel(): void {
+  open.value = false
 }
-onMounted(() => document.addEventListener('mousedown', onOutside))
-onUnmounted(() => document.removeEventListener('mousedown', onOutside))
 
 const provinces = provinceOptions
 const cities = computed(() => cityOptions(expandedProvince.value))
@@ -106,7 +103,7 @@ function isExpanded(code: string): boolean {
 </script>
 
 <template>
-  <div ref="root" class="relative w-full">
+  <div class="relative w-full">
     <button
       type="button"
       class="flex h-8 w-full items-center justify-between gap-1 rounded-md border border-input bg-background px-2 text-sm outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring"
@@ -180,6 +177,13 @@ function isExpanded(code: string): boolean {
         @click="clearAll"
       >
         不限地区
+      </button>
+      <button
+        type="button"
+        class="cursor-pointer whitespace-nowrap px-3 py-1.5 text-sm text-muted-foreground outline-none hover:bg-accent/50 hover:text-foreground"
+        @click="closePanel"
+      >
+        收起
       </button>
     </div>
   </div>

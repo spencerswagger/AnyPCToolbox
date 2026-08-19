@@ -238,7 +238,7 @@ function removeEntry(index: number): void {
           rows="1"
           spellcheck="false"
           autocomplete="off"
-          placeholder="输入身份证号，一行一个（支持 15 位自动转 18 位），回车确认，Shift+Enter 换行..."
+          placeholder="输入身份证号，回车确认，Shift+Enter 换行"
           class="block w-full resize-none overflow-hidden rounded-2xl bg-accent/60 py-3 pl-4 pr-24 text-sm font-mono leading-relaxed outline-none placeholder:text-muted-foreground focus:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
           @input="autoGrow"
           @keydown.enter.exact.prevent="handleSubmit"
