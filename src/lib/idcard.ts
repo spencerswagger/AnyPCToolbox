@@ -163,7 +163,7 @@ export function parseId(id: string, areas: AreaMap, now: Date = new Date()): IdI
  * 占位名称、港澳台（81/82/83）与外国人（93）段。
  */
 export function generateIds(options: GenerateOptions, areas: AreaMap, now: Date = new Date()): string[] {
-  const count = Math.max(1, Math.min(10000, options.count ?? 10))
+  const count = Math.max(1, Math.min(1000, options.count ?? 10))
   const minAge = Math.max(0, Math.min(150, options.minAge ?? 0))
   const maxAge = Math.max(minAge, Math.min(150, options.maxAge ?? 100))
 

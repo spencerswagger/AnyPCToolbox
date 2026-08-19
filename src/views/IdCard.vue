@@ -92,17 +92,21 @@ function resetGrow(): void {
 }
 
 /** 身份证号列表上限 */
-const MAX_ENTRIES = 10000
+const MAX_ENTRIES = 1000
 
 /** 入列（去重）并选中第一个。去重按原始输入字符串；15 位升位可能与 18 位输入归一化相同，但视为两条不同条目。 */
 function addIds(
   items: Array<{ id: string; original: string }>,
   source: 'submit' | 'generate',
 ): void {
+  // 超过上限时整体拒绝，不允许继续添加
+  if (entries.value.length + items.length > MAX_ENTRIES) {
+    flashStatus(`最多支持 ${MAX_ENTRIES} 条，当前已有 ${entries.value.length} 条`)
+    return
+  }
   let firstId = ''
   let added = 0
   let dup = 0
-  let limited = 0
   for (const it of items) {
     if (!firstId) firstId = it.id
     // 去重依据：按 original（提交）或按 id（生成，生成不会重复 original）
@@ -114,10 +118,6 @@ function addIds(
       dup++
       continue
     }
-    if (entries.value.length >= MAX_ENTRIES) {
-      limited++
-      continue
-    }
     entries.value.push({ id: it.id, original: it.original, addedAt: Date.now() })
     added++
   }
@@ -125,7 +125,6 @@ function addIds(
   const parts = []
   if (added) parts.push(`新增 ${added} 条`)
   if (dup) parts.push(`已存在 ${dup} 条`)
-  if (limited) parts.push(`列表已达 ${MAX_ENTRIES} 条上限，跳过 ${limited} 条`)
   flashStatus(parts.length ? parts.join('，') : '无新增')
 }
 
@@ -145,9 +144,24 @@ function handleSubmit(): void {
   nextTick(() => resetGrow())
 }
 
+/** 输入框失焦时把数量钳制到 [1, 1000]，让上限可感知 */
+function clampGenCount(): void {
+  const n = genCount.value
+  if (n === null || n === undefined || Number.isNaN(n)) {
+    genCount.value = 10
+    return
+  }
+  const c = Math.floor(n)
+  if (c < 1) genCount.value = 1
+  else if (c > 1000) {
+    genCount.value = 1000
+    flashStatus('数量上限为 1000')
+  } else if (c !== n) genCount.value = c
+}
+
 function handleGenerate(): void {
   let count = Math.floor(Number(genCount.value)) || 10
-  const clamped = count < 1 ? 1 : Math.min(10000, count)
+  const clamped = count < 1 ? 1 : Math.min(1000, count)
   if (clamped !== count) {
     genCount.value = clamped
     count = clamped
@@ -434,7 +448,8 @@ function removeEntry(index: number): void {
                 v-model.number="genCount"
                 type="number"
                 min="1"
-                max="10000"
+                max="1000"
+                @change="clampGenCount"
                 class="h-8 w-full rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
