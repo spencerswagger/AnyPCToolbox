@@ -342,7 +342,7 @@ function clearAll(): void {
           暂无数据，请在上方输入或生成
         </div>
         <ul v-else class="max-h-[480px] divide-y overflow-y-auto">
-          <li v-for="e in entries" :key="e.id">
+          <li v-for="e in entries" :key="e.original">
             <div
               role="button"
               tabindex="0"
