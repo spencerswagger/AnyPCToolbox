@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { areas, provinceOptions, cityOptions, districtOptions } from '@/lib/areaData'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
+const root = ref<HTMLElement | null>(null)
 const open = ref(false)
 const selProvince = ref('')
 const selCity = ref('')
@@ -40,6 +41,13 @@ function syncFromValue(v: string): void {
   expandedProvince.value = selProvince.value
 }
 
+// 点击组件外部时关闭（面板内部点击不影响展开态，保证省→市→区可连续选择）
+function onOutside(e: MouseEvent): void {
+  if (open.value && root.value && !root.value.contains(e.target as Node)) open.value = false
+}
+onMounted(() => document.addEventListener('mousedown', onOutside))
+onUnmounted(() => document.removeEventListener('mousedown', onOutside))
+
 const provinces = provinceOptions
 const cities = computed(() => cityOptions(expandedProvince.value))
 /** 是否有市级（直辖市/省直辖县级无市） */
@@ -63,6 +71,9 @@ const displayText = computed(() => {
   return parts.join(' / ')
 })
 
+function toggle(): void {
+  open.value = !open.value
+}
 function pickProvince(code: string): void {
   expandedProvince.value = code
   selProvince.value = code
@@ -95,12 +106,12 @@ function isExpanded(code: string): boolean {
 </script>
 
 <template>
-  <div class="relative w-full">
+  <div ref="root" class="relative w-full">
     <button
       type="button"
       class="flex h-8 w-full items-center justify-between gap-1 rounded-md border border-input bg-background px-2 text-sm outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring"
       :class="open ? 'bg-accent/50' : ''"
-      @click.stop="open = !open"
+      @click.stop="toggle"
     >
       <span class="truncate text-left" :class="displayText ? 'text-foreground' : 'text-muted-foreground'">
         {{ displayText || '不限地区' }}
@@ -122,17 +133,11 @@ function isExpanded(code: string): boolean {
       </svg>
     </button>
 
-    <!-- 透明遮罩，点击关闭 -->
-    <div v-if="open" class="fixed inset-0 z-40" @click="open = false"></div>
-
-    <div
-      v-if="open"
-      class="absolute left-0 top-full z-50 mt-1 flex overflow-hidden rounded-lg border bg-popover shadow-md"
-    >
+    <div v-if="open" class="absolute left-0 top-full z-50 mt-1 flex overflow-hidden rounded-lg border bg-background shadow-md">
       <ul class="max-h-64 w-36 overflow-y-auto">
         <li
           class="cursor-pointer px-3 py-1.5 text-sm outline-none"
-          :class="isSelected(p.code) ? 'bg-accent text-accent-foreground' : 'text-popover-foreground hover:bg-accent/50'"
+          :class="isSelected(p.code) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent/50'"
           v-for="p in provinces"
           :key="p.code"
           @click="pickProvince(p.code)"
@@ -147,7 +152,7 @@ function isExpanded(code: string): boolean {
           :class="
             isSelected(c.code) || isExpanded(c.code)
               ? 'bg-accent text-accent-foreground'
-              : 'text-popover-foreground hover:bg-accent/50'
+              : 'text-foreground hover:bg-accent/50'
           "
           v-for="c in secondColumn"
           :key="c.code"
@@ -160,11 +165,7 @@ function isExpanded(code: string): boolean {
       <ul v-if="thirdColumn.length" class="max-h-64 w-36 overflow-y-auto border-l">
         <li
           class="cursor-pointer px-3 py-1.5 text-sm outline-none"
-          :class="
-            isSelected(d.code)
-              ? 'bg-accent text-accent-foreground'
-              : 'text-popover-foreground hover:bg-accent/50'
-          "
+          :class="isSelected(d.code) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent/50'"
           v-for="d in thirdColumn"
           :key="d.code"
           @click="pickDistrict(d.code)"

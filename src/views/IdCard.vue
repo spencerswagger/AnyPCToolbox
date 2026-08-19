@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { normalizeId, parseId, generateIds, type IdInfo, type Sex } from '@/lib/idcard'
 import { areas, areaUpdatedAt } from '@/lib/areaData'
@@ -27,6 +27,7 @@ const genSex = ref<'' | Sex>('')
 const genMinAge = ref('')
 const genMaxAge = ref('')
 const genArea = ref('')
+const inputEl = ref<HTMLTextAreaElement | null>(null)
 
 function loadEntries(): IdEntry[] {
   try {
@@ -82,6 +83,18 @@ function flashStatus(msg: string): void {
   }, 3000)
 }
 
+/** 输入框随内容行数自适应高度 */
+function autoGrow(): void {
+  const el = inputEl.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.max(64, el.scrollHeight)}px`
+}
+function resetGrow(): void {
+  const el = inputEl.value
+  if (el) el.style.height = 'auto'
+}
+
 /** 入列（去重）并选中第一个。去重按原始输入字符串；15 位升位可能与 18 位输入归一化相同，但视为两条不同条目。 */
 function addIds(
   items: Array<{ id: string; original: string }>,
@@ -121,6 +134,7 @@ function handleSubmit(): void {
   }
   addIds(items, 'submit')
   input.value = ''
+  nextTick(() => resetGrow())
 }
 
 function handleGenerate(): void {
@@ -171,6 +185,14 @@ function clearAll(): void {
   selectedId.value = ''
   flashStatus('列表已清空')
 }
+function removeEntry(index: number): void {
+  const [removed] = entries.value.splice(index, 1)
+  if (!removed) return
+  if (selectedId.value === removed.id) {
+    selectedId.value = entries.value[Math.min(index, entries.value.length - 1)]?.id ?? ''
+  }
+  flashStatus('已删除 1 条')
+}
 </script>
 
 <template>
@@ -209,25 +231,24 @@ function clearAll(): void {
 
     <!-- 输入区（居中式，参考对话首页） -->
     <div class="mx-auto max-w-xl pt-2">
-      <div class="flex flex-col">
+      <div class="relative">
         <textarea
+          ref="inputEl"
           v-model="input"
-          rows="3"
-          placeholder="输入身份证号，一行一个（支持 15 位自动转 18 位），回车确认，Shift+Enter 换行..."
+          rows="1"
           spellcheck="false"
           autocomplete="off"
-          class="w-full resize-none rounded-2xl bg-accent/60 px-4 py-3 font-mono text-sm leading-relaxed outline-none placeholder:text-muted-foreground focus:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+          placeholder="输入身份证号，一行一个（支持 15 位自动转 18 位），回车确认，Shift+Enter 换行..."
+          class="block w-full resize-none overflow-hidden rounded-2xl bg-accent/60 py-3 pl-4 pr-24 text-sm font-mono leading-relaxed outline-none placeholder:text-muted-foreground focus:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+          @input="autoGrow"
           @keydown.enter.exact.prevent="handleSubmit"
         />
-        <div class="mt-3 flex items-center gap-3">
-          <button
-            class="inline-flex items-center justify-center rounded-full bg-primary px-6 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring outline-none"
-            @click="handleSubmit"
-          >
-            确认
-          </button>
-          <span class="text-xs text-muted-foreground">回车快速提交</span>
-        </div>
+        <button
+          class="absolute bottom-2 right-2 inline-flex items-center justify-center rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring outline-none"
+          @click="handleSubmit"
+        >
+          确认
+        </button>
       </div>
     </div>
 
@@ -245,7 +266,7 @@ function clearAll(): void {
           暂无数据，请在顶部输入或生成
         </div>
         <ul v-else class="max-h-[480px] divide-y overflow-y-auto">
-          <li v-for="e in entries" :key="e.original">
+          <li v-for="(e, i) in entries" :key="e.original">
             <div
               role="button"
               tabindex="0"
@@ -265,7 +286,7 @@ function clearAll(): void {
                 :class="
                   infos.get(e.id)?.valid
                     ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-destructive/15 text-destructive'
+                    : 'bg-destructive/15 text-destructive dark:bg-red-500/20 dark:text-red-400'
                 "
               >
                 {{ infos.get(e.id)?.valid ? '✓ 通过' : '✗ 不通过' }}
@@ -290,6 +311,29 @@ function clearAll(): void {
                   <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
                 </svg>
               </button>
+              <button
+                class="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity outline-none hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100 group-hover:opacity-100 dark:hover:text-red-400"
+                title="删除"
+                @click.stop="removeEntry(i)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  <line x1="10" x2="10" y1="11" y2="17" />
+                  <line x1="14" x2="14" y1="11" y2="17" />
+                </svg>
+              </button>
             </div>
           </li>
         </ul>
@@ -308,7 +352,7 @@ function clearAll(): void {
         <div v-else-if="selectedInfo" class="space-y-3 p-4">
           <div
             v-if="!selectedInfo.valid"
-            class="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            class="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-400"
           >
             <span>⚠️</span>
             <span>无效：{{ selectedInfo.reason }}</span>
