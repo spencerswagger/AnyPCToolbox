@@ -78,7 +78,8 @@ jobs:
       - name: Align version to tag
         env:
           TAG: ${{ github.ref_name }}
-        run: node --input-type=module -e '
+        run: |
+          node --input-type=module -e '
             import { readFileSync, writeFileSync } from "node:fs"
             const tag = process.env.TAG
             const ver = tag.replace(/^v/, "")
