@@ -74,12 +74,14 @@ jobs:
 
       # 制品文件名与 updater 清单版本均来自 tauri.conf.json 的 version；
       # 用 tag(去掉前导 v) 对齐，避免出现标签 v0.0.2 而制品带 1.0.0 的不一致
+      # 版本以 env 注入并在 node 内处理，跨平台一致(避免 bash/pwsh 差异)
       - name: Align version to tag
-        run: |
-          VER="${GITHUB_REF_NAME#v}"
-          node --input-type=module -e '
+        env:
+          TAG: ${{ github.ref_name }}
+        run: node --input-type=module -e '
             import { readFileSync, writeFileSync } from "node:fs"
-            const ver = process.env.VER
+            const tag = process.env.TAG
+            const ver = tag.replace(/^v/, "")
             const file = "src-tauri/tauri.conf.json"
             const out = readFileSync(file, "utf8").replace(
               /"version"\s*:\s*"[^"]+"/,
