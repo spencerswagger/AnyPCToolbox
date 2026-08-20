@@ -72,6 +72,23 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # 制品文件名与 updater 清单版本均来自 tauri.conf.json 的 version；
+      # 用 tag(去掉前导 v) 对齐，避免出现标签 v0.0.2 而制品带 1.0.0 的不一致
+      - name: Align version to tag
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs"
+            const ver = process.env.VER
+            const file = "src-tauri/tauri.conf.json"
+            const out = readFileSync(file, "utf8").replace(
+              /"version"\s*:\s*"[^"]+"/,
+              `"version": "${ver}"`,
+            )
+            writeFileSync(file, out)
+            console.log("tauri.conf.json version -> " + ver)
+          '
+
       - name: Inject updater endpoint from GitHub variable
         env:
           UPDATER_BASE_URL: ${{ vars.UPDATER_BASE_URL }}
