@@ -1,7 +1,31 @@
 <script setup lang="ts">
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const frame = ref<HTMLIFrameElement | null>(null)
+let timer: number | undefined
+const MIN_HEIGHT = 640
+
+/** 读取 iframe 内部内容高度并同步到外层，使页面完整展示（同源可访问 contentDocument） */
+function syncHeight(): void {
+  const el = frame.value
+  if (!el) return
+  const doc = el.contentDocument
+  if (!doc || !doc.body) return
+  const h = Math.max(MIN_HEIGHT, Math.ceil(doc.body.scrollHeight))
+  if (el.offsetHeight !== h) {
+    el.style.height = `${h}px`
+  }
+}
+
+onMounted(() => {
+  timer = window.setInterval(syncHeight, 300)
+})
+
+onBeforeUnmount(() => {
+  if (timer !== undefined) window.clearInterval(timer)
+})
 </script>
 
 <template>
@@ -27,12 +51,15 @@ const router = useRouter()
       </div>
     </div>
 
-    <!-- 直接嵌入离线检测页 -->
+    <!-- 直接嵌入离线检测页，高度随内容自适应 -->
     <div class="overflow-hidden rounded-lg border bg-card">
       <iframe
+        ref="frame"
         src="/tools/os-arch-detector.html"
         title="操作系统与芯片架构检测"
-        class="block w-full min-h-[680px] border-0"
+        class="block w-full border-0"
+        :style="{ minHeight: MIN_HEIGHT + 'px' }"
+        @load="syncHeight"
       />
     </div>
   </div>
