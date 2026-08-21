@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>你的电脑信息检测</title>
+<style>
+  :root { --ok:#16a34a; --warn:#d97706; --bg:#f4f5f7; --ink:#1f2329; --muted:#6b7280; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; }
+  body { min-height:100vh; padding:32px 16px; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+         background:var(--bg); color:var(--ink); }
+  .wrap { max-width:720px; margin:0 auto; }
+  h1 { font-size:28px; text-align:center; margin:0 0 6px; }
+  .sub { text-align:center; color:var(--muted); font-size:15px; margin:0 0 24px; }
+  .card { background:#fff; border-radius:16px; padding:32px 40px; box-shadow:0 10px 30px rgba(0,0,0,.08); }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:20px 12px; border-bottom:1px solid #eef0f3; vertical-align:middle; }
+  th { color:var(--muted); font-weight:500; font-size:17px; width:1%; white-space:nowrap; padding-left:0; }
+  td { font-size:20px; font-weight:600; padding-left:6px; }
+  tr:last-child th, tr:last-child td { border-bottom:none; }
+  .result-line { margin-top:22px; border-radius:12px; padding:16px 20px; font-size:16px; line-height:1.8; border:1px solid; display:none; }
+  .result-ok { background:#eefaf2; border-color:#cdeed9; color:var(--ok); }
+  .result-ok::before { content:"✓ "; font-weight:800; }
+  .result-warn { background:#fff8ec; border-color:#f3e2bc; color:#8a5a00; }
+  .browser-list { margin-top:20px; border-top:1px dashed #e2e6ec; padding-top:18px; display:none; }
+  .browser-list-title { font-size:15px; font-weight:700; color:var(--ink); margin-bottom:10px; }
+  .browser-item { font-size:15px; line-height:1.7; color:var(--ink); padding-left:16px; position:relative; }
+  .browser-item::before { content:"•"; position:absolute; left:4px; color:#b0b6bf; }
+  .tips { margin-top:24px; border-radius:16px; background:#f8fafc; border:1px solid #e6e9ee; padding:26px 30px; }
+  .tips h2 { margin:0 0 6px; font-size:19px; color:var(--ink); }
+  .tips .lead { color:var(--muted); font-size:15px; margin:0 0 18px; }
+  .tabs { display:flex; gap:8px; border-bottom:2px solid #e6e9ee; margin-bottom:20px; }
+  .tab { appearance:none; background:none; border:none; cursor:pointer; padding:10px 16px;
+         font-size:16px; font-weight:600; color:var(--muted); border-bottom:3px solid transparent;
+         margin-bottom:-2px; border-radius:0; }
+  .tab:hover { color:var(--ink); }
+  .tab.active { color:var(--ink); border-bottom-color:var(--ok); }
+  .tabpane { display:none; }
+  .tabpane.active { display:block; }
+  .sys { margin-bottom:18px; }
+  .sys:last-child { margin-bottom:0; }
+  .sys-title { font-size:17px; font-weight:700; margin-bottom:8px; }
+  .sys-steps { border-left:3px solid #e2e6ec; padding-left:16px; }
+  .step { font-size:16px; line-height:1.55; margin-bottom:8px; color:var(--ink); }
+  .step .sub-step { display:block; margin-top:6px; }
+  .step.numbered { display:flex; gap:8px; }
+  .step .n { color:var(--muted); }
+  .step b { font-weight:700; }
+  .lil { display:block; color:var(--muted); font-size:14px; margin-top:4px; }
+  .arrow { color:#b0b6bf; margin:0 4px; }
+  .note { color:var(--muted); font-size:15px; }
+  code { background:#eef1f5; border-radius:5px; padding:1px 7px; font-family:Consolas,Menlo,monospace; }
+  .ico { display:inline-flex; vertical-align:-3px; margin:0 2px; }
+  .ico svg { width:15px; height:15px; }
+  .th-wrap { display:inline-flex; align-items:center; gap:6px; }
+  .tip { position:relative; display:inline-flex; align-items:center; justify-content:center;
+         width:16px; height:16px; border-radius:50%; background:#d7dbe1; color:#fff; font-size:11px;
+         font-weight:700; cursor:help; line-height:1; flex:none; }
+  .tip::after { content:none; }
+  .tip:hover::after, .tip:focus::after {
+    content:attr(data-tip); white-space:pre-line;
+    position:absolute; left:50%; top:calc(100% + 8px); transform:translateX(-50%);
+    background:#262b33; color:#fff; font-weight:400; font-size:13px; line-height:1.5;
+    padding:10px 12px; border-radius:8px; width:240px; z-index:20; text-align:left;
+    box-shadow:0 6px 18px rgba(0,0,0,.18); }
+  .tip:hover::before, .tip:focus::before {
+    content:""; position:absolute; left:50%; top:calc(100% + 3px); transform:translateX(-50%);
+    border:5px solid transparent; border-bottom-color:#262b33; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>你的电脑信息</h1>
+  <p class="sub">自动识别，无需操作</p>
+  <div class="card">
+    <table>
+      <tbody><tr><th><span class="th-wrap">操作系统<span class="tip" tabindex="0" data-tip="这里只会显示以下一种：
+– Windows：最常见的电脑系统
+– macOS：苹果电脑系统
+– Linux：开源系统，含统信、麒麟等国产系统
+– 其他系统：不在以上三类，通常是 ChromeOS、Android、iOS 等">?</span></span></th><td id="os-cell">正在检查…</td></tr>
+      <tr><th><span class="th-wrap">芯片架构<span class="tip" tabindex="0" data-tip="这里只会显示以下一种：
+– amd64（x64 / x86-64）：Intel 或 AMD 芯片，绝大多数电脑
+– arm64：ARM 芯片，多见于苹果 M 系列、骁龙、飞腾、麒麟等
+– x86（32 位）：较老的一种 32 位芯片
+– 识别失败：浏览器识别不出，需自己手动查看">?</span></span></th><td id="arch-cell">正在检查…</td></tr>
+    </tbody></table>
+    <div id="result-line" class="result-line"></div>
+    <div id="browser-list" class="browser-list">
+      <div class="browser-list-title">建议换用的浏览器：</div>
+      <div class="browser-item">Google Chrome 谷歌浏览器</div>
+      <div class="browser-item">Microsoft Edge 微软浏览器</div>
+      <div class="browser-item">Firefox 火狐浏览器</div>
+      <div class="browser-item">Opera 欧朋浏览器</div>
+      <div class="browser-item">Brave 浏览器</div>
+      <div class="browser-item">360 安全浏览器 / 360 极速浏览器</div>
+      <div class="browser-item">搜狗浏览器</div>
+      <div class="browser-item">QQ 浏览器</div>
+      <div class="browser-item">UC 浏览器</div>
+      <div class="browser-item">猎豹浏览器</div>
+      <div class="browser-item">奇安信浏览器</div>
+      <div class="browser-item">360 信创浏览器</div>
+      <div class="browser-item">麒麟浏览器</div>
+      <div class="browser-item">统信浏览器</div>
+      <div class="browser-item">龙芯浏览器 / 星火浏览器</div>
+      <div class="browser-item">红莲花浏览器</div>
+    </div>
+  </div>
+
+  <div class="tips">
+    <h2>自己动手查一下，通常更准</h2>
+    <p class="lead">照着下面你自己的系统来做，一分钟就能找到。</p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="linux" aria-selected="false">Linux / 国产系统</button>
+      <button class="tab" role="tab" data-tab="windows" aria-selected="false">Windows</button>
+      <button class="tab" role="tab" data-tab="macos" aria-selected="false">macOS（苹果）</button>
+    </div>
+
+    <div class="tabpane" data-pane="linux">
+    <div class="sys">
+      <div class="sys-steps">
+        <div class="step"><span class="n">1.</span>打开「<b>终端</b>」，任选一种方式就行：
+          <span class="sub-step">方式一（最快）：同时按下键盘上的 <b>Ctrl + Alt + T</b> 三个键。</span>
+          <span class="sub-step">方式二：在桌面空白处点<b>右键</b>，在菜单里选「<b>在终端中打开</b>」。</span>
+          <span class="sub-step">方式三：打开系统的<b>应用菜单</b>（所有程序的列表），在搜索框搜“<b>终端</b>”或“<b>Terminal</b>”再点开。应用菜单的位置各系统不同，通常在屏幕角落的图标里。</span>
+          <span class="sub-step">终端就是那个<b>黑色小窗口</b>样的程序。</span></div>
+        <div class="step"><span class="n">2.</span>在窗口里输入 <code>uname -m</code>，然后按<b>回车</b>。
+          <span class="lil">注意：uname 和 -m 之间要留一个空格，输入完一定要按回车键。</span></div>
+        <div class="step"><span class="n">3.</span>看输出的一行字母：
+          <span class="sub-step">显示 <b>x86_64</b>：芯片架构是 <b>amd64</b>。</span>
+          <span class="sub-step">显示 <b>aarch64</b>：芯片架构是 <b>arm64</b>。</span></div>
+      </div>
+    </div>
+    </div>
+
+    <div class="tabpane" data-pane="windows">
+    <div class="sys">
+      <div class="sys-steps">
+        <div class="step"><span class="n">1.</span>进入能看到「系统类型」的页面：
+          <span class="sub-step"><b>Windows 11</b>：点屏幕正中下方的「开始」按钮 <span class="ico"><svg viewBox="0 0 100 100" fill="#04a0f4"><path d="M20 20h27v27H20zm33 0h27v27H53zM20 53h27v27H20zm33 0h27v27H53z"></path></svg></span>，再点「<b>设置</b>」<span class="ico"><svg viewBox="0 0 24 24" fill="#6b7280"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm9.4 4c0-.5-.1-1.1-.2-1.6l2-1.6-2-3.5-2.4 1a8.3 8.3 0 00-2.8-1.6l-.4-2.6h-4L11 4.7a8.3 8.3 0 00-2.8 1.6l-2.4-1-2 3.5 2 1.6c-.1.5-.2 1.1-.2 1.6s.1 1.1.2 1.6l-2 1.6 2 3.5 2.4-1a8.3 8.3 0 002.8 1.6l.4 2.6h4l.4-2.6a8.3 8.3 0 002.8-1.6l2.4 1 2-3.5-2-1.6c.1-.5.2-1.1.2-1.6z"></path></svg></span>，然后「<b>系统</b>」-「<b>关于</b>」。</span>
+          <span class="sub-step"><b>Windows 10</b>：点屏幕左下角的「开始」按钮 <span class="ico"><svg viewBox="0 0 100 100" fill="#04a0f4"><path d="M20 20h27v27H20zm33 0h26v27H53zM20 53h27v27H20zm33 0h26v27H53z"></path></svg></span>，再点「<b>设置</b>」<span class="ico"><svg viewBox="0 0 24 24" fill="#6b7280"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm9.4 4c0-.5-.1-1.1-.2-1.6l2-1.6-2-3.5-2.4 1a8.3 8.3 0 00-2.8-1.6l-.4-2.6h-4L11 4.7a8.3 8.3 0 00-2.8 1.6l-2.4-1-2 3.5 2 1.6c-.1.5-.2 1.1-.2 1.6s.1 1.1.2 1.6l-2 1.6 2 3.5 2.4-1a8.3 8.3 0 002.8 1.6l.4 2.6h4l.4-2.6a8.3 8.3 0 002.8-1.6l2.4 1 2-3.5-2-1.6c.1-.5.2-1.1.2-1.6z"></path></svg></span>，然后「<b>系统</b>」-「<b>关于</b>」。</span>
+          <span class="sub-step"><b>Windows 8</b>：把鼠标移到屏幕最右边滑出侧边栏，点「设置」<span class="ico"><svg viewBox="0 0 24 24" fill="#6b7280"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm9.4 4c0-.5-.1-1.1-.2-1.6l2-1.6-2-3.5-2.4 1a8.3 8.3 0 00-2.8-1.6l-.4-2.6h-4L11 4.7a8.3 8.3 0 00-2.8 1.6l-2.4-1-2 3.5 2 1.6c-.1.5-.2 1.1-.2 1.6s.1 1.1.2 1.6l-2 1.6 2 3.5 2.4-1a8.3 8.3 0 002.8 1.6l.4 2.6h4l.4-2.6a8.3 8.3 0 002.8-1.6l2.4 1 2-3.5-2-1.6c.1-.5.2-1.1.2-1.6z"></path></svg></span>，然后「<b>电脑和设备</b>」-「<b>电脑信息</b>」。</span>
+          <span class="sub-step"><b>Windows 7 / XP</b>：在桌面上<b>右键点「我的电脑」或「计算机」，选「属性」</b>。</span></div>
+        <div class="step"><span class="n">2.</span>找到写着「<b>系统类型</b>」的一行，看写的是什么：
+          <span class="sub-step">写的是「<b>x64</b> 处理器」：芯片架构是 <b>amd64</b>。</span>
+          <span class="sub-step">写的是「<b>ARM64</b>」：芯片架构是 <b>arm64</b>。</span>
+          <span class="sub-step">写的是「<b>x86</b>」或什么都没标：芯片架构是 <b>x86（32 位）</b>。</span></div>
+      </div>
+    </div>
+    </div>
+
+    <div class="tabpane" data-pane="macos">
+    <div class="sys">
+      <div class="sys-steps">
+        <div class="step"><span class="n">1.</span>点屏幕最左上角的<b>苹果标志</b>。</div>
+        <div class="step"><span class="n">2.</span>点「<b>本机</b>」（也叫“关于本机”）。</div>
+        <div class="step"><span class="n">3.</span>看「芯片」或「处理器」那一行：
+          <span class="sub-step">如果写的是「<b>Apple M1 / M2 / M3 / M4</b>」这样的：芯片架构是 <b>arm64</b>。</span>
+          <span class="sub-step">如果写的是「<b>Intel</b>」：芯片架构是 <b>amd64</b>。</span></div>
+      </div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---- 检测引擎（纯函数，可注入 navigator） ----
+  function normalizeOS(nav) {
+    var p = (nav.userAgentData && nav.userAgentData.platform) || nav.platform || (nav.userAgent || '');
+    var s = String(p).toLowerCase();
+    if (s.indexOf('win') !== -1) return 'Windows';
+    if (s.indexOf('mac') !== -1) return 'macOS';
+    if (s.indexOf('linux') !== -1 || s.indexOf('x11') !== -1) return 'Linux';
+    return 'Other';
+  }
+
+  function normalizeArch(a) {
+    if (!a) return null;
+    a = String(a).toLowerCase();
+    if (a === 'x86-64' || a === 'x64' || a === 'amd64') return 'amd64';
+    if (a === 'arm64' || a === 'arm') return 'arm64';
+    if (a === 'x86' || a === 'ia-32') return 'x86';
+    return a;
+  }
+
+  function isChromium(nav) {
+    var brands = [];
+    try { if (nav.userAgentData && Array.isArray(nav.userAgentData.brands)) brands = nav.userAgentData.brands; } catch (_) {}
+    for (var i = 0; i < brands.length; i++) {
+      if (String((brands[i] && brands[i].brand) || '').toLowerCase().indexOf('chromium') !== -1) return true;
+    }
+    var ua = String(nav.userAgent || '').toLowerCase();
+    return ua.indexOf('chromium') !== -1 || ua.indexOf('chrome/') !== -1;
+  }
+
+  function detect(nav) {
+    var osName = normalizeOS(nav);
+    var chromium = isChromium(nav);
+    var resolved = { os: osName, arch: null, reliable: false, chromium: chromium };
+    if (chromium && nav.userAgentData && typeof nav.userAgentData.getHighEntropyValues === 'function') {
+      return nav.userAgentData.getHighEntropyValues(['architecture']).then(function (hv) {
+        if (hv && hv.architecture) { resolved.arch = normalizeArch(hv.architecture); resolved.reliable = true; }
+        return resolved;
+      }).catch(function () { return resolved; });
+    }
+    return Promise.resolve(resolved);
+  }
+
+  var OS_NAME = { Windows: 'Windows', macOS: 'macOS', Linux: 'Linux', Other: '其他系统' };
+  var ARCH_LABEL = { amd64: 'amd64（x64 / x86-64）', arm64: 'arm64', x86: 'x86（32 位）' };
+
+  var TAB_KEY = { Windows: 'windows', macOS: 'macos', Linux: 'linux', Other: 'linux' };
+
+  function setupTabs(activeKey) {
+    var tabs = document.querySelectorAll('.tab');
+    var panes = document.querySelectorAll('.tabpane');
+    function select(key) {
+      tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === key); t.setAttribute('aria-selected', t.dataset.tab === key ? 'true' : 'false'); });
+      panes.forEach(function (p) { p.classList.toggle('active', p.dataset.pane === key); });
+    }
+    tabs.forEach(function (t) {
+      t.addEventListener('click', function () { select(t.dataset.tab); });
+    });
+    select(activeKey);
+  }
+
+  function boot() {
+    detect(navigator).then(function (r) {
+      var osCell = document.getElementById('os-cell');
+      var archCell = document.getElementById('arch-cell');
+      var line = document.getElementById('result-line');
+      var browserList = document.getElementById('browser-list');
+
+      osCell.textContent = OS_NAME[r.os] || '其他系统';
+      setupTabs(TAB_KEY[r.os] || 'linux');
+
+      if (r.reliable && r.arch) {
+        archCell.textContent = ARCH_LABEL[r.arch] || r.arch.toUpperCase();
+        line.className = 'result-line result-ok';
+        line.innerHTML = '已自动识别出你的电脑信息，结果如上。';
+        line.style.display = 'block';
+        browserList.style.display = 'none';
+      } else {
+        archCell.textContent = '识别失败';
+        line.className = 'result-line result-warn';
+        if (r.chromium) {
+          line.innerHTML = '自动识别失败，请按下方“自己动手查”的步骤核对你的系统。';
+          browserList.style.display = 'none';
+        } else {
+          line.innerHTML = '自动识别失败，请更换浏览器后再打开本页尝试。';
+          browserList.style.display = 'block';
+        }
+        line.style.display = 'block';
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', boot); } else { boot(); }
+})();
+</script>
+
+</body></html>

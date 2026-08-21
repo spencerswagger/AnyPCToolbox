@@ -24,6 +24,11 @@ const router = createRouter({
       name: 'idcard',
       component: () => import('@/views/IdCard.vue'),
     },
+    {
+      path: '/arch-os',
+      name: 'arch-os',
+      component: () => import('@/views/ArchOs.vue'),
+    },
   ],
 })
 

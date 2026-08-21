@@ -23,6 +23,13 @@ const tools = [
     route: '/idcard',
     tag: 'v1.0',
   },
+  {
+    icon: '🖥️',
+    name: '操作系统与芯片架构',
+    description: '自动识别系统与芯片架构，附带各平台的图文自查指引',
+    route: '/arch-os',
+    tag: 'v1.0',
+  },
 ]
 </script>
 
