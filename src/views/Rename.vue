@@ -262,7 +262,7 @@ async function undo() {
     <div class="flex items-center gap-3 border-t px-4 py-2 text-xs text-muted-foreground">
       <span>共 {{ stats.total }} · 将改 {{ stats.willChange }}{{ stats.invalid ? ' · 非法 ' + stats.invalid : '' }} · 冲突 {{ stats.conflict }}</span>
       <div class="ml-auto flex items-center gap-3">
-        <span v-if="isFsAccess && !dirHandle" class="text-xs text-muted-foreground">未选文件夹（单文件操作只能导出）</span>
+        <span v-if="isFsAccess && !dirHandle" class="text-xs text-muted-foreground">未选文件夹，无法应用</span>
         <span v-if="applied" class="text-xs text-emerald-600 dark:text-emerald-400">已应用，可撤销或重新选择文件/调整规则</span>
         <button v-if="isFsAccess" type="button" class="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40" :disabled="applied || !dirHandle || !stats.willChange || stats.conflict > 0 || stats.invalid > 0" @click="applyChanges">应用更改</button>
         <button v-else type="button" class="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40" :disabled="!stats.willChange" @click="exportList">导出改名列表</button>
