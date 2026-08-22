@@ -39,6 +39,26 @@ const error = computed<string | null>(() => {
   }
 })
 
+// 格式化源文本失败时单独呈现（与解析错误区分的提示）
+const formatMsg = ref<string | null>(null)
+
+function formatSource() {
+  if (!sourceText.value.trim()) return
+  const f = sourceFormat.value.format
+  if (!f) return
+  formatMsg.value = null
+  try {
+    sourceText.value = f(sourceText.value)
+  } catch (e) {
+    formatMsg.value = (e as Error).message
+  }
+}
+
+watch(sourceText, () => {
+  formatMsg.value = null
+  nextTick(() => autoResize(textareaRef.value))
+})
+
 const stats = computed(() => {
   if (!sourceText.value.trim()) return { lines: 0, chars: 0, bytes: 0 }
   return {
@@ -203,7 +223,6 @@ function autoResize(el: HTMLTextAreaElement | null) {
   })
 }
 
-watch(sourceText, () => nextTick(() => autoResize(textareaRef.value)))
 watch(sourceFormatId, resetColumns)
 watch(strategy, resetColumns)
 
@@ -312,15 +331,22 @@ watch(
       </select>
       <button
         class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+        @click="formatSource"
+        :disabled="!sourceText.trim() || !sourceFormat.format"
+      >
+        格式化
+      </button>
+      <button
+        class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
         @click="loadSample"
       >
         加载示例
       </button>
     </div>
 
-    <div v-if="error" class="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+    <div v-if="error || formatMsg" class="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
       <span>⚠️</span>
-      <span>{{ error }}</span>
+      <span>{{ formatMsg || error }}</span>
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -355,19 +381,24 @@ watch(
           <div v-if="records === null" class="flex min-h-[300px] items-center justify-center p-4 text-sm text-muted-foreground">
             解析失败，请检查输入
           </div>
-          <div v-else-if="effectiveColumns.length === 0" class="flex min-h-[300px] items-center justify-center p-4 text-sm text-muted-foreground">
+          <div v-else-if="currentBase().length === 0" class="flex min-h-[300px] items-center justify-center p-4 text-sm text-muted-foreground">
             输入数据以预览表格...
           </div>
           <table v-else class="w-full text-sm">
             <thead>
               <tr class="border-b bg-accent/50">
-                <th v-for="c in effectiveColumns" :key="c" class="px-3 py-2 text-left align-top">
+                <th
+                  v-for="c in currentBase()"
+                  :key="c"
+                  class="px-3 py-2 text-left align-top"
+                  :class="hidden.has(c) ? 'opacity-40' : ''"
+                >
                   <div class="flex items-center gap-1">
                     <input
                       type="checkbox"
                       :checked="!hidden.has(c)"
                       class="h-3.5 w-3.5 shrink-0"
-                      :title="'隐藏/显示 ' + c"
+                      :title="(hidden.has(c) ? '显示 ' : '隐藏 ') + c"
                       @change="toggleCol(c)"
                     />
                     <span class="break-all font-medium">{{ c }}</span>
