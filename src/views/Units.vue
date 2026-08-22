@@ -262,9 +262,9 @@ function sourceHost(url: string): string {
               <div
                 class="flex cursor-default items-center gap-2 rounded-md border bg-card/50 px-3 py-2 text-sm"
               >
-                <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ eq.name }}（{{ eq.unit }}）</span>
+                <span class="min-w-0 flex-none text-muted-foreground">{{ eq.name }}（{{ eq.unit }}）</span>
                 <span v-if="eq.noRate" class="shrink-0 text-xs text-muted-foreground">无汇率数据</span>
-                <span v-else class="shrink-0 font-mono">{{ formatValue(eq.value) }}</span>
+                <span v-else class="min-w-0 flex-1 break-words text-right font-mono">{{ formatValue(eq.value) }}</span>
                 <span v-if="eq.approx" class="shrink-0 rounded bg-accent px-1.5 py-0.5 text-xs text-muted-foreground">近似</span>
                 <button
                   v-if="!eq.noRate"
