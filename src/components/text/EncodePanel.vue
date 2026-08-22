@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { reactive, computed } from 'vue'
 import {
   encodeBase64, decodeBase64,
   decodeUrl, encodeUnicode, decodeUnicode,
   encodeHex, decodeHex, encodeHtml, decodeHtml, rot, type Result,
 } from '@/lib/text/encoders'
 
-const props = defineProps<{ input: string }>()
+const props = defineProps<{ input: string; algo: string }>()
 
 type ConfigValue = boolean | number | string
 
@@ -43,6 +43,8 @@ function b64Encode(s: string, c: Record<string, ConfigValue>): Result {
   let v = r.value
   if (c.urlSafe === true) v = v.replace(/\+/g, '-').replace(/\//g, '_')
   if (c.pad === false) v = v.replace(/=+$/, '')
+  if (c.case === '大写') v = v.toUpperCase()
+  else if (c.case === '小写') v = v.toLowerCase()
   return { ok: true, value: v }
 }
 function b64Decode(s: string, c: Record<string, ConfigValue>): Result {
@@ -86,84 +88,72 @@ function htmlEncode(s: string, c: Record<string, ConfigValue>): Result {
   return { ok: true, value: out }
 }
 
-// ---------- 分组与子项 ----------
-const groups: { label: string; items: SubItem[] }[] = [
+// ---------- 算法注册（每种算法一个 tab，面板只渲染当前兜 `algo` 的那一个） ----------
+const subs: SubItem[] = [
   {
-    label: 'Base64 系列',
-    items: [
-      {
-        id: 'base64',
-        label: 'Base64',
-        configs: [
-          { key: 'urlSafe', label: 'URL 安全', kind: 'bool', def: false },
-          { key: 'pad', label: '补 = 填充', kind: 'bool', def: true },
-        ],
-        enc: b64Encode,
-        dec: b64Decode,
-      },
+    id: 'base64',
+    label: 'Base64',
+    configs: [
+      { key: 'urlSafe', label: 'URL 安全', kind: 'bool', def: false },
+      { key: 'pad', label: '补 = 填充', kind: 'bool', def: true },
+      { key: 'case', label: '大小写', kind: 'select', options: ['默认', '大写', '小写'], def: '默认' },
     ],
+    enc: b64Encode,
+    dec: b64Decode,
   },
   {
-    label: '通用转义',
-    items: [
-      {
-        id: 'url',
-        label: 'URL',
-        configs: [{ key: 'preserveUri', label: '保留 URI 字符', kind: 'bool', def: false }],
-        enc: urlEncode,
-        dec: (s) => decodeUrl(s),
-      },
-      {
-        id: 'unicode',
-        label: 'Unicode',
-        configs: [{ key: 'upperHex', label: 'Hex 大写', kind: 'bool', def: false }],
-        enc: unicodeEncode,
-        dec: (s) => decodeUnicode(s),
-      },
-      {
-        id: 'hex',
-        label: 'Hex',
-        configs: [
-          { key: 'upperCase', label: 'Hex 大写', kind: 'bool', def: false },
-          { key: 'separator', label: '分隔符', kind: 'select', options: ['无', '空格', '冒号'], def: '无' },
-        ],
-        enc: hexEnc,
-        dec: hexDec,
-      },
-      {
-        id: 'html',
-        label: 'HTML 实体',
-        configs: [{ key: 'named', label: '命名实体', kind: 'bool', def: true }],
-        enc: htmlEncode,
-        dec: (s) => decodeHtml(s),
-      },
-      {
-        id: 'rot',
-        label: 'ROT',
-        configs: [{ key: 'shift', label: '位移量', kind: 'number', min: 1, max: 25, def: 13 }],
-        enc: (s, c) => rot(s, typeof c.shift === 'number' ? c.shift : 13),
-        dec: (s, c) => rot(s, typeof c.shift === 'number' ? c.shift : 13),
-      },
+    id: 'url',
+    label: 'URL',
+    configs: [{ key: 'preserveUri', label: '保留 URI 字符', kind: 'bool', def: false }],
+    enc: urlEncode,
+    dec: (s) => decodeUrl(s),
+  },
+  {
+    id: 'unicode',
+    label: 'Unicode',
+    configs: [{ key: 'upperHex', label: 'Hex 大写', kind: 'bool', def: false }],
+    enc: unicodeEncode,
+    dec: (s) => decodeUnicode(s),
+  },
+  {
+    id: 'hex',
+    label: 'Hex',
+    configs: [
+      { key: 'upperCase', label: 'Hex 大写', kind: 'bool', def: false },
+      { key: 'separator', label: '分隔符', kind: 'select', options: ['无', '空格', '冒号'], def: '无' },
     ],
+    enc: hexEnc,
+    dec: hexDec,
+  },
+  {
+    id: 'html',
+    label: 'HTML 实体',
+    configs: [{ key: 'named', label: '命名实体', kind: 'bool', def: true }],
+    enc: htmlEncode,
+    dec: (s) => decodeHtml(s),
+  },
+  {
+    id: 'rot',
+    label: 'ROT',
+    configs: [{ key: 'shift', label: '位移量', kind: 'number', min: 1, max: 25, def: 13 }],
+    enc: (s, c) => rot(s, typeof c.shift === 'number' ? c.shift : 13),
+    dec: (s, c) => rot(s, typeof c.shift === 'number' ? c.shift : 13),
   },
 ]
-const allSubs: SubItem[] = groups.flatMap((g) => g.items)
 
 // 初始化各配置默认值
-for (const g of groups)
-  for (const it of g.items) {
-    boolCfg[it.id] = {}
-    numCfg[it.id] = {}
-    strCfg[it.id] = {}
-    for (const c of it.configs) {
-      if (c.kind === 'bool') boolCfg[it.id][c.key] = c.def as boolean
-      else if (c.kind === 'number') numCfg[it.id][c.key] = c.def as number
-      else strCfg[it.id][c.key] = c.def as string
-    }
+for (const it of subs) {
+  boolCfg[it.id] = {}
+  numCfg[it.id] = {}
+  strCfg[it.id] = {}
+  for (const c of it.configs) {
+    if (c.kind === 'bool') boolCfg[it.id][c.key] = c.def as boolean
+    else if (c.kind === 'number') numCfg[it.id][c.key] = c.def as number
+    else strCfg[it.id][c.key] = c.def as string
   }
+}
 
-const active = ref('base64')
-const activeSub = computed(() => allSubs.find((s) => s.id === active.value) ?? allSubs[0]!)
+const activeSub = computed(() => subs.find((s) => s.id === props.algo) ?? subs[0]!)
 
 const encResult = computed(() => (props.input ? activeSub.value.enc(props.input, cfgOf(activeSub.value.id)) : null))
 const decResult = computed(() => {
@@ -202,23 +192,6 @@ function download(text: string, name: string): void {
 
 <template>
   <div class="space-y-3">
-    <div class="space-y-2">
-      <div v-for="g in groups" :key="g.label">
-        <div class="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">{{ g.label }}</div>
-        <div class="flex flex-wrap gap-1">
-          <button
-            v-for="s in g.items"
-            :key="s.id"
-            class="rounded-md px-2.5 py-1 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            :class="active === s.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'"
-            @click="active = s.id"
-          >
-            {{ s.label }}
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- 算法微调配置 -->
     <div v-if="activeSub.configs.length" class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border p-3">
       <label v-for="c in activeSub.configs" :key="c.key" class="flex items-center gap-2 text-sm">

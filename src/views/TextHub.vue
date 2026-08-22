@@ -153,9 +153,9 @@ function flashStatus(msg: string): void {
               {{ cat.label }}
             </button>
           </div>
-          <!-- 右侧大类内子项 + 结果面板 -->
+          <!-- 右侧大类内子项 + 结果面板（单算法大类不显示冗余的子 tab 层） -->
           <div class="flex min-w-0 flex-1 flex-col">
-            <div class="flex flex-wrap gap-1 border-b px-3 py-2">
+            <div v-if="itemsInCategory.length > 1" class="flex flex-wrap gap-1 border-b px-3 py-2">
               <button
                 v-for="item in itemsInCategory"
                 :key="item.id"
@@ -170,7 +170,7 @@ function flashStatus(msg: string): void {
               输入文本后，此处实时显示 {{ currentItem.label }} 结果
             </div>
             <div v-else class="min-h-0 flex-1 overflow-auto p-3">
-              <component :is="currentItem.component" :input="input" />
+              <component :is="currentItem.component" :input="input" v-bind="currentItem.props" />
             </div>
           </div>
         </div>

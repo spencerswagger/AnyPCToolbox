@@ -40,6 +40,27 @@ export async function computeHashes(input: string): Promise<HashItem[]> {
   return items
 }
 
+export type HashId = 'md5' | 'crc32' | 'sha1' | 'sha256' | 'sha512'
+const HASH_LABELS: Record<HashId, string> = {
+  md5: 'MD5',
+  crc32: 'CRC32',
+  sha1: 'SHA-1',
+  sha256: 'SHA-256',
+  sha512: 'SHA-512',
+}
+
+/** 计算单个哈希，供「每种算法一个 tab」的哈希面板使用 */
+export async function computeHash(id: HashId, input: string): Promise<HashItem> {
+  if (id === 'md5') return { id, label: HASH_LABELS[id], value: md5(input) }
+  if (id === 'crc32') return { id, label: HASH_LABELS[id], value: crc32hex(input) }
+  try {
+    const algo: ShaAlgo = id === 'sha1' ? 'SHA-1' : id === 'sha256' ? 'SHA-256' : 'SHA-512'
+    return { id, label: HASH_LABELS[id], value: await sha256(input, algo) }
+  } catch {
+    return { id, label: HASH_LABELS[id], value: '', error: '计算失败' }
+  }
+}
+
 /* ---- MD5（RFC 1321，增量接口） ---- */
 const S = [
   7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 4,
