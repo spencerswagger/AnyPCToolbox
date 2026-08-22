@@ -24,40 +24,40 @@ function setType(t: RuleType) {
       <option v-for="t in RULE_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
     </select>
 
-    <!-- 查找-替换 -->
+    <!-- 查找替换 -->
     <template v-if="rule.type === 'replace'">
       <label class="flex items-center gap-1">查找 <input v-model="rule.find" class="w-20 rounded-md border border-input bg-background px-1.5 py-1" placeholder="IMG_"></label>
       <span class="text-muted-foreground">→</span>
-      <label class="flex items-center gap-1">替换为 <input v-model="rule.with" class="w-20 rounded-md border border-input bg-background px-1.5 py-1" placeholder="空=删"></label>
-      <label class="flex items-center gap-1"><input v-model="rule.onlyFirst" type="checkbox"> 仅首个</label>
-      <label class="flex items-center gap-1"><input v-model="rule.regex" type="checkbox"> 正则</label>
+      <label title="将匹配到的内容替换为指定文本；若留空则删除匹配到的内容" class="flex items-center gap-1">替换为 <input v-model="rule.with" class="w-20 rounded-md border border-input bg-background px-1.5 py-1"></label>
+      <label class="flex items-center gap-1" title="只替换第一处匹配"><input v-model="rule.onlyFirst" type="checkbox"> 仅首处</label>
+      <label class="flex items-center gap-1" title="将查找内容作为正则表达式匹配"><input v-model="rule.regex" type="checkbox"> 正则</label>
     </template>
 
     <!-- 前缀/后缀 -->
     <template v-if="rule.type === 'prefix' || rule.type === 'suffix'">
-      <label class="flex items-center gap-1">{{ rule.type === 'prefix' ? '前缀' : '后缀' }} <input v-model="rule.text" class="w-28 rounded-md border border-input bg-background px-1.5 py-1" placeholder="例如 2025-"></label>
+      <label class="flex items-center gap-1" :title="rule.type === 'prefix' ? '在文件名开头插入的文本' : '在文件名末尾（扩展名前）插入的文本'">{{ rule.type === 'prefix' ? '前缀' : '后缀' }} <input v-model="rule.text" class="w-28 rounded-md border border-input bg-background px-1.5 py-1" placeholder="例如 2025-"></label>
     </template>
 
     <!-- 序号 -->
     <template v-if="rule.type === 'sequence'">
-      <label class="flex items-center gap-1">起始 <input v-model.number="rule.start" type="number" class="w-14 rounded-md border border-input bg-background px-1.5 py-1"></label>
-      <label class="flex items-center gap-1">步长 <input v-model.number="rule.step" type="number" class="w-14 rounded-md border border-input bg-background px-1.5 py-1"></label>
-      <label class="flex items-center gap-1">位数 <input v-model.number="rule.width" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"></label>
-      <label class="flex items-center gap-0.5"><input v-model="rule.position" type="radio" value="front"> 前</label>
-      <label class="flex items-center gap-0.5"><input v-model="rule.position" type="radio" value="back"> 后</label>
-      <label class="flex items-center gap-1">隔 <input v-model="rule.sep" class="w-10 rounded-md border border-input bg-background px-1.5 py-1"></label>
+      <label class="flex items-center gap-1" title="序号起始值"><input v-model.number="rule.start" type="number" min="0" class="w-14 rounded-md border border-input bg-background px-1.5 py-1"> 起始</label>
+      <label class="flex items-center gap-1" title="序号每次的递增量"><input v-model.number="rule.step" type="number" class="w-14 rounded-md border border-input bg-background px-1.5 py-1"> 步长</label>
+      <label class="flex items-center gap-1" title="序号按几位显示，不足补零"><input v-model.number="rule.width" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"> 位数</label>
+      <label class="flex items-center gap-0.5" title="序号加在名称前"><input v-model="rule.position" type="radio" value="front"> 前</label>
+      <label class="flex items-center gap-0.5" title="序号加在名称后"><input v-model="rule.position" type="radio" value="back"> 后</label>
+      <label class="flex items-center gap-1" title="序号与名称之间的分隔文本"><input v-model="rule.sep" class="w-10 rounded-md border border-input bg-background px-1.5 py-1"> 分隔</label>
     </template>
 
     <!-- 时间戳 -->
     <template v-if="rule.type === 'timestamp'">
-      <select v-model="rule.format" class="rounded-md border border-input bg-background px-1.5 py-1 text-xs">
+      <select v-model="rule.format" class="rounded-md border border-input bg-background px-1.5 py-1 text-xs" title="时间戳的显示格式">
         <option v-for="f in TIMESTAMP_FORMATS" :key="f" :value="f">{{ f }}</option>
       </select>
-      <label class="flex items-center gap-0.5"><input v-model="rule.source" type="radio" value="mtime"> 文件时间</label>
-      <label class="flex items-center gap-0.5"><input v-model="rule.source" type="radio" value="now"> 当前</label>
-      <label class="flex items-center gap-0.5"><input v-model="rule.position" type="radio" value="front"> 前</label>
-      <label class="flex items-center gap-0.5"><input v-model="rule.position" type="radio" value="back"> 后</label>
-      <label class="flex items-center gap-1">隔 <input v-model="rule.sep" class="w-10 rounded-md border border-input bg-background px-1.5 py-1"></label>
+      <label class="flex items-center gap-0.5" title="使用文件的修改时间"><input v-model="rule.source" type="radio" value="mtime"> 文件时间</label>
+      <label class="flex items-center gap-0.5" title="使用当前时间"><input v-model="rule.source" type="radio" value="now"> 当前时间</label>
+      <label class="flex items-center gap-0.5" title="时间戳加在名称前"><input v-model="rule.position" type="radio" value="front"> 前</label>
+      <label class="flex items-center gap-0.5" title="时间戳加在名称后"><input v-model="rule.position" type="radio" value="back"> 后</label>
+      <label class="flex items-center gap-1" title="时间戳与名称之间的分隔文本"><input v-model="rule.sep" class="w-10 rounded-md border border-input bg-background px-1.5 py-1"> 分隔</label>
     </template>
 
     <!-- 大小写 -->
@@ -71,14 +71,14 @@ function setType(t: RuleType) {
 
     <!-- 删除字符：删固定位 -->
     <template v-if="rule.type === 'remove'">
-      <label class="flex items-center gap-1">删第 <input v-model.number="rule.start" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"> 位起</label>
-      <label class="flex items-center gap-1"><input v-model.number="rule.count" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"> 位</label>
+      <label class="flex items-center gap-1" title="从第几位开始删除"><span>位置</span> <input v-model.number="rule.start" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"></label>
+      <label class="flex items-center gap-1" title="一次删除的字符数量"><span>数量</span> <input v-model.number="rule.count" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"></label>
     </template>
 
     <!-- 扩展名 -->
     <template v-if="rule.type === 'extension'">
-      <label class="flex items-center gap-0.5"><input v-model="rule.mode" type="radio" value="keep"> 保留</label>
-      <label class="flex items-center gap-0.5"><input v-model="rule.mode" type="radio" value="replace"> 替换为</label>
+      <label class="flex items-center gap-0.5" title="保留原扩展名"><input v-model="rule.mode" type="radio" value="keep"> 保留</label>
+      <label class="flex items-center gap-0.5" title="统一替换为指定的扩展名"><input v-model="rule.mode" type="radio" value="replace"> 替换</label>
       <input v-if="rule.mode === 'replace'" v-model="rule.ext" class="w-16 rounded-md border border-input bg-background px-1.5 py-1" placeholder="jpg">
     </template>
 

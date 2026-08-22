@@ -27,7 +27,7 @@ export type Rule =
 
 /** 规则类型下拉选项（顺序即展示顺序） */
 export const RULE_TYPES: { value: RuleType; label: string }[] = [
-  { value: 'replace', label: '查找-替换' },
+  { value: 'replace', label: '查找替换' },
   { value: 'prefix', label: '前缀' },
   { value: 'suffix', label: '后缀' },
   { value: 'sequence', label: '序号' },

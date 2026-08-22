@@ -287,7 +287,7 @@ async function applyChanges() {
   })
   include.value = include.value.map(() => true)
   applied.value = true
-  toast(undefined, `已改名 ${ops.length} 个文件`)
+  toast(undefined, `已重命名 ${ops.length} 个文件`)
 }
 
 function exportList() {
@@ -302,7 +302,7 @@ function exportList() {
   a.download = 'rename-plan.txt'
   a.click()
   URL.revokeObjectURL(url)
-  toast(undefined, `已导出 ${lines.length} 条改名计划`)
+  toast(undefined, `已导出 ${lines.length} 条方案`)
 }
 
 async function undo() {
@@ -325,11 +325,11 @@ async function undo() {
     <div class="flex items-center gap-2">
       <button type="button" class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors" @click="router.push('/')">← 返回</button>
       <span class="text-muted-foreground">|</span>
-      <h2 class="text-lg font-semibold">文件批量重命名</h2>
+      <h2 class="text-lg font-semibold">文件重命名</h2>
     </div>
 
     <!-- 能力边界提示 -->
-    <div v-if="!isFsAccess" class="flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">⚠️ 当前环境无法直接修改磁盘文件，仅支持预览与导出改名列表（建议使用 Chrome/Edge 或桌面版）。</div>
+    <div v-if="!isFsAccess" class="flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">⚠️ 当前环境无法直接修改磁盘文件，仅可预览并导出重命名方案。建议使用 Chrome/Edge 桌面版。</div>
 
     <!-- 文件区（树状，整体可拖放） -->
     <div class="flex flex-col rounded-lg border" @dragover.prevent @drop="onDrop">
@@ -370,7 +370,8 @@ async function undo() {
     <!-- 规则区 -->
     <div class="flex flex-col rounded-lg border">
       <div class="flex items-center gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-        <span>🧰 规则（从上到下依次作用）</span>
+        <span>🧰 规则</span>
+        <span class="ml-1 text-muted-foreground normal-case" title="规则按顺序依次作用于文件名">（依次生效）</span>
         <div class="ml-auto flex items-center gap-2">
           <button type="button" class="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90" @click="addRule">+ 添加规则</button>
         </div>
@@ -378,13 +379,13 @@ async function undo() {
       <div v-if="rules.length" class="space-y-2 p-3">
         <RuleBlock v-for="(r, i) in rules" :key="i" :rule="r" :can-up="i > 0" :can-down="i < rules.length - 1" @update:rule="updateRule(i, $event)" @remove="removeRule(i)" @move="moveRule(i, $event)" />
       </div>
-      <div v-else class="px-3 py-6 text-center text-sm text-muted-foreground">点击右上角"添加规则"开始配置</div>
+      <div v-else class="px-3 py-6 text-center text-sm text-muted-foreground">点击「添加规则」新增</div>
     </div>
 
     <!-- 预览区 -->
     <div class="flex flex-col rounded-lg border">
       <div class="flex items-center gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-        <span>👁️ 预览（绿色=将改名，灰色=不变，整行可点击勾选）</span>
+        <span title="绿色=将重命名，灰色=不变；整行可点击勾选">👁️ 预览（绿=新名，灰=不变）</span>
         <div class="ml-auto flex items-center gap-3 text-xs normal-case">
           <label class="flex items-center gap-1 text-muted-foreground">排序
             <select v-model="sortKey" class="rounded-md border border-input bg-background px-1.5 py-1 text-xs">
@@ -394,7 +395,7 @@ async function undo() {
             </select>
             <button type="button" class="rounded-md border border-input bg-background px-1.5 py-1 text-xs" @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'">{{ sortDir === 'asc' ? '↑' : '↓' }}</button>
           </label>
-          <label class="flex items-center gap-1 text-muted-foreground normal-case"><input v-model="autoNumber" type="checkbox"> 冲突自动加序号</label>
+          <label title="当新名称与其他文件冲突时，自动追加序号以避免重名" class="flex items-center gap-1 text-muted-foreground normal-case"><input v-model="autoNumber" type="checkbox"> 自动防重名</label>
         </div>
       </div>
       <ul v-if="rows.length" class="max-h-72 overflow-auto divide-y divide-border">
@@ -417,7 +418,7 @@ async function undo() {
 
     <!-- 底栏 -->
     <div class="flex items-center gap-3 border-t px-4 py-2 text-xs text-muted-foreground">
-      <span>共 {{ stats.total }} · 将改 {{ stats.willChange }}{{ stats.invalid ? ' · 非法 ' + stats.invalid : '' }} · 冲突 {{ stats.conflict }}</span>
+      <span>共 {{ stats.total }} · 会重命名 {{ stats.willChange }}{{ stats.invalid ? ' · 非法 ' + stats.invalid : '' }} · 重名 {{ stats.conflict }}</span>
       <div class="ml-auto flex items-center gap-3">
         <span v-if="isFsAccess && !hasWritable" class="text-xs text-muted-foreground">未选文件夹，无法应用</span>
         <span v-if="applied" class="text-xs text-emerald-600 dark:text-emerald-400">已应用，可撤销或调整</span>
