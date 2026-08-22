@@ -4,12 +4,18 @@
 const DB_NAME = 'rename'
 const STORE = 'history'
 
+/** 一次改名里的一条记录（含该文件所在的根目录句柄，支持跨夹/递归） */
+export interface RenameOp {
+  dir: FileSystemDirectoryHandle
+  oldName: string
+  newName: string
+}
+
 /** 一次应用的一组操作（对应一次"应用更改"） */
 export interface HistoryBatch {
   id?: number
   time: number
-  dir: FileSystemDirectoryHandle
-  ops: { oldName: string; newName: string }[]
+  ops: RenameOp[]
 }
 
 let db: IDBDatabase | null = null

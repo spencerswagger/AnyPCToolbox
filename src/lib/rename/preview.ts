@@ -5,12 +5,15 @@ import { isRuleActive, type Rule } from './rules.ts'
 
 /** 进入预览的最小文件描述（view 里由 FS 句柄或 <input> File 填充） */
 export interface FileEntry2 {
+  /** 要改名的完整名称（可为相对路径，如 sub/img.jpg） */
   name: string
   size?: number
   type?: string
   mtime?: number
   /** FS Access 模式下持有文件句柄以写盘；只读模式为 null */
   handle: FileSystemFileHandle | null
+  /** 该文件所属的根目录句柄（写盘用）；仅通过文件夹选取时有值 */
+  root?: FileSystemDirectoryHandle | null
 }
 
 export interface PreviewRow {
