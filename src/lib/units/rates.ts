@@ -5,6 +5,10 @@ import { readCachedRates, writeCachedRates } from '@/lib/units/idb'
 
 export type RateSource = '内置快照' | '本地缓存' | '在线更新'
 
+/** 汇率数据提供方：品牌名与官网（接口域名为 open.er-api.com） */
+export const RATE_PROVIDER_NAME = 'exchangerate-api.com'
+export const RATE_PROVIDER_URL = 'https://www.exchangerate-api.com'
+
 export interface RateState {
   rates: Rates
   source: RateSource

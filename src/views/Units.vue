@@ -6,7 +6,7 @@ import { tokenize, type Token } from '@/lib/units/lexer'
 import { equivalentsFor, formatValue, type EquivResult } from '@/lib/units/convert'
 import { COMMON_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/units/money'
 import { ALIASES, DIMS, UNITS, type Dim, type UnitDef } from '@/lib/units/registry'
-import { loadInitialRates, onRatesUpdate, refreshRatesOnline, type RateState } from '@/lib/units/rates'
+import { loadInitialRates, onRatesUpdate, refreshRatesOnline, RATE_PROVIDER_NAME, RATE_PROVIDER_URL, type RateState } from '@/lib/units/rates'
 
 const router = useRouter()
 const { toast } = useToaster()
@@ -264,10 +264,20 @@ function sourceHost(url: string): string {
     <!-- 底部状态栏 -->
     <div class="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
       <div v-if="rateState" class="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span
-          >汇率来源：<span class="font-medium text-foreground">{{ rateState.source }}</span></span
-        >
-        <span v-if="rateState.rates._source" class="font-mono">{{ sourceHost(rateState.rates._source) }}</span>
+        <span class="flex items-center gap-1">
+          汇率来源：
+          <a
+            :href="RATE_PROVIDER_URL"
+            target="_blank"
+            rel="noreferrer"
+            class="font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+          >
+            {{ RATE_PROVIDER_NAME }}
+          </a>
+          <span v-if="rateState.rates._source" class="font-mono">（{{ sourceHost(rateState.rates._source) }}）</span>
+        </span>
+        <span>每日更新，非实时</span>
+        <span>数据：{{ rateState.source }}</span>
         <span v-if="formatDate(rateState.rates._updatedAt)">更新于 {{ formatDate(rateState.rates._updatedAt) }}</span>
       </div>
       <span v-else>汇率加载中…</span>
