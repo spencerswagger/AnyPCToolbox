@@ -20,7 +20,7 @@ function setType(t: RuleType) {
   <div class="space-y-3 rounded-lg border p-3">
     <div class="flex items-center gap-2">
       <span class="text-sm font-medium">{{ label }}</span>
-      <select class="rounded-md border border-input bg-background px-2 py-1 text-xs" :value="rule.type" @change="setType(($event.target as HTMLSelectElement).value as RuleType)">
+      <select class="rounded-md border border-input bg-background px-2 py-1 text-xs" :value="rule.type" @change="setType(RULE_TYPES.find(t => t.value === ($event.target as HTMLSelectElement).value)?.value ?? rule.type)">
         <option v-for="t in RULE_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
       </select>
       <div class="ml-auto flex items-center gap-1">
