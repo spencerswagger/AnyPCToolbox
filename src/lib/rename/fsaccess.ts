@@ -65,8 +65,9 @@ export function filesToEntries(files: FileList): DirFileEntry[] {
 }
 
 /**
- * 对目录应用改名：新柄建 -> 写旧文件字节 -> 删旧柄。
- * 返回失败的旧名列表（已落盘的改名也计入成功的 applied/撤销记录）；成功则记录到撤销栈。
+ * 对目录应用改名：先一次性快照本批所有旧文件内容，再依次"写目标 -> 删源"。
+ * 快照先行保证链式/互换改名（一文件的新名=另一文件的旧名）也能保留每份原始内容。
+ * 返回失败的旧名列表；成功部分记入撤销栈。
  */
 export async function commitRenames(
   dir: FileSystemDirectoryHandle,
@@ -74,10 +75,26 @@ export async function commitRenames(
 ): Promise<{ ok: boolean; failed: string[] }> {
   const failed: string[] = []
   const applied: { oldName: string; newName: string }[] = []
-  // 本次将腾出的旧路径集合：允许写入这些目标（支持链式/互换改名）
   const vacated = new Set(ops.map((o) => o.oldName))
+  // 阶段一：快照所有旧文件内容（File/Blob 持有内存）
+  const snapshots = new Map<string, Blob>()
   for (const op of ops) {
     if (op.oldName === op.newName) continue
+    try {
+      const f = await (await dir.getFileHandle(op.oldName)).getFile()
+      snapshots.set(op.oldName, f)
+    } catch {
+      failed.push(op.oldName)
+    }
+  }
+  // 阶段二：写目标 -> 删源
+  for (const op of ops) {
+    if (op.oldName === op.newName) continue
+    const data = snapshots.get(op.oldName)
+    if (!data) {
+      if (!failed.includes(op.oldName)) failed.push(op.oldName)
+      continue
+    }
     let w: FileSystemWritableFileStream | null = null
     try {
       // 防御：目标已存在且非本批即将腾出路径时跳过，避免覆盖无关文件
@@ -86,17 +103,14 @@ export async function commitRenames(
         failed.push(op.oldName)
         continue
       }
-      const oldHandle = await dir.getFileHandle(op.oldName)
-      const file = await oldHandle.getFile()
       const newHandle: FileSystemFileHandle = await dir.getFileHandle(op.newName, { create: true })
       w = await newHandle.createWritable()
-      await w.write(file)
+      await w.write(data)
       await w.close()
       w = null
       await dir.removeEntry(op.oldName)
       applied.push(op)
     } catch {
-      // 回滚：先中止未关闭的 writable（丢弃缓冲不落盘），再尝试删除已建新柄
       try { await w?.abort() } catch { /* 忽略 */ }
       try { await dir.removeEntry(op.newName) } catch { /* 忽略 */ }
       failed.push(op.oldName)
@@ -112,7 +126,7 @@ export async function commitRenames(
   return { ok: failed.length === 0, failed }
 }
 
-/** 撤销一次批：恢复旧柄，删除新柄 */
+/** 撤销一次批：恢复旧柄，删除新柄；失败时清理可能新建的旧柄残留 */
 export async function revertBatch(
   dir: FileSystemDirectoryHandle,
   ops: { oldName: string; newName: string }[],
@@ -131,6 +145,8 @@ export async function revertBatch(
       await dir.removeEntry(op.newName)
     } catch {
       try { await w?.abort() } catch { /* 忽略 */ }
+      // 回滚残留：本次用 create:true 尝试建立 oldName 但失败，删除可能留下的空/半写文件
+      try { await dir.removeEntry(op.oldName) } catch { /* 忽略 */ }
       failed.push(op.newName)
     }
   }
