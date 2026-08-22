@@ -31,6 +31,13 @@ const tools = [
     tag: 'v1.0',
   },
   {
+    icon: '🔤',
+    name: '文本处理中台',
+    description: '一次输入全部产出：编解码、哈希、统计、时间戳识别、智能解码',
+    route: '/text-hub',
+    tag: 'v1.1',
+  },
+  {
     icon: '📁',
     name: '文件重命名',
     description: '可视化规则块 + 实时预览，批量重命名文件并在桌面端真正写盘',

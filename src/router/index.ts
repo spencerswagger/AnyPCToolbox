@@ -25,6 +25,11 @@ const router = createRouter({
       component: () => import('@/views/IdCard.vue'),
     },
     {
+      path: '/text-hub',
+      name: 'text-hub',
+      component: () => import('@/views/TextHub.vue'),
+    },
+    {
       path: '/arch-os',
       name: 'arch-os',
       component: () => import('@/views/ArchOs.vue'),
