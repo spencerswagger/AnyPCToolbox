@@ -13,6 +13,8 @@ export interface Token {
   dim?: Dim
   /** 无法识别原因（无法识别单位 / 数字格式异常） */
   error?: string
+  /** 由 mergeTokens 合并而成：raw 已含各片段单位文本 */
+  merged?: boolean
 }
 
 // 前置货币符号（多字符优先），最长匹配

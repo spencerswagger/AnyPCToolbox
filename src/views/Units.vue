@@ -5,7 +5,7 @@ import { useToaster } from '@/lib/ui/use-toast'
 import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipPortal, TooltipContent } from 'radix-vue'
 import { Copy } from 'lucide-vue-next'
 import { tokenize, type Token } from '@/lib/units/lexer'
-import { equivalentsFor, formatValue, type EquivResult, type Equivalent } from '@/lib/units/convert'
+import { equivalentsFor, formatValue, mergeTokens, type EquivResult, type Equivalent } from '@/lib/units/convert'
 import { allCurrencyCodes, COMMON_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/units/money'
 import { ALIASES, DIMS, UNITS, type Dim, type UnitDef } from '@/lib/units/registry'
 import { loadInitialRates, onRatesUpdate, refreshRatesOnline, RATE_PROVIDER_NAME, RATE_PROVIDER_URL, type RateState } from '@/lib/units/rates'
@@ -22,11 +22,12 @@ interface Entry {
   token: Token
   result: EquivResult | null
 }
-const entries = computed<Entry[]>(() =>
-  tokens.value.map((token) => ({ token, result: equivalentsFor(token, rateState.value?.rates ?? null) })),
-)
-const recognizedCount = computed(() => tokens.value.filter((t) => t.dim !== undefined).length)
-const unrecognizedCount = computed(() => tokens.value.length - recognizedCount.value)
+const entries = computed<Entry[]>(() => {
+  const merged = mergeTokens(tokens.value, rateState.value?.rates ?? null)
+  return merged.map((token) => ({ token, result: equivalentsFor(token, rateState.value?.rates ?? null) }))
+})
+const recognizedCount = computed(() => entries.value.filter((e) => e.token.dim !== undefined).length)
+const unrecognizedCount = computed(() => entries.value.filter((e) => e.token.dim === undefined).length)
 
 // ---- 单位匹配与换算规则详表（折叠，默认收起） ----
 const showRules = ref(false)
@@ -126,7 +127,7 @@ function handleConvert(): void {
     toast(undefined, '未识别到数值，请输入如 30kg 或 $1.99')
     return
   }
-  if (unrecognizedCount.value === n) toast(undefined, `无法识别 ${n} 个片段`)
+  if (unrecognizedCount.value === entries.value.length) toast(undefined, `无法识别 ${unrecognizedCount.value} 个片段`)
 }
 
 async function copyValue(text: string): Promise<void> {
@@ -234,7 +235,7 @@ function sourceHost(url: string): string {
       <div v-for="(e, i) in entries" :key="i" class="rounded-lg border">
         <div class="flex items-center gap-2 border-b px-3 py-2">
           <span class="text-sm font-semibold"
-            >片段：{{ e.token.raw }}<template v-if="e.token.unit"> {{ e.token.unit }}</template></span
+            >片段：{{ e.token.raw }}<template v-if="e.token.unit && !e.token.merged"> {{ e.token.unit }}</template></span
           >
           <span
             v-if="e.result"

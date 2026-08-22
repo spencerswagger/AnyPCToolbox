@@ -1,7 +1,7 @@
 // 单位换算核心逻辑自检脚本（设计文档约定的验证方式，非单元测试框架）
 // 运行：node scripts/verify-units.ts
 import { tokenize } from '../src/lib/units/lexer.ts'
-import { equivalentsFor, formatValue } from '../src/lib/units/convert.ts'
+import { equivalentsFor, formatValue, mergeTokens } from '../src/lib/units/convert.ts'
 import { equivalentCurrencies, type Rates } from '../src/lib/units/money.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -107,9 +107,27 @@ check('1 week → 7 day', near(wk.equivalents.find((e) => e.unit === 'day')?.val
 check('1 week → 604800 s', near(wk.equivalents.find((e) => e.unit === 's')?.value ?? 0, 604800))
 
 console.log('数值展示')
-check('formatValue(3e8) → 3.0e+8', formatValue(3e8) === '3.0e+8', formatValue(3e8))
+check('formatValue(3e8) → 300000000', formatValue(3e8) === '300000000', formatValue(3e8))
 check('formatValue(1000) → 1000', formatValue(1000) === '1000')
 check('formatValue(1/3) → 0.333333', formatValue(1 / 3) === '0.333333', formatValue(1 / 3))
+check('formatValue(1e-9) → 0.000000001', formatValue(1e-9) === '0.000000001', formatValue(1e-9))
+
+console.log('同量纲连续片段合并')
+const mTime = mergeTokens(tokenize('3min20s'))
+check('3min20s → 1 段', mTime.length === 1, String(mTime.length))
+check('3min20s → 合计 200s', mTime[0].unit === 'min' && near((mTime[0].value ?? 0) * 60, 200), JSON.stringify(mTime[0]))
+check('3min20s → raw 合并为 3min20s', mTime[0].raw === '3min20s', mTime[0].raw)
+const mT = mergeTokens(tokenize('3t200kg'))
+check('3t200kg → 合计 3200kg', mT[0].unit === 't' && near((mT[0].value ?? 0) * 1000, 3200), JSON.stringify(mT[0]))
+check('3t200kg → raw 合并为 3t200kg', mT[0].raw === '3t200kg', mT[0].raw)
+const mMix = mergeTokens(tokenize('30kg 和 $1.99'))
+check('不同量纲不合并 → 2 段', mMix.length === 2, String(mMix.length))
+const mTemp = mergeTokens(tokenize('100℃20℃'))
+check('温度不合并 → 2 段', mTemp.length === 2, String(mTemp.length))
+if (rates) {
+  const mUsd = mergeTokens(tokenize('$3 $5'), rates)
+  check('$3 $5 → 合并 8 USD', mUsd.length === 1 && near(mUsd[0].value ?? 0, 8), JSON.stringify(mUsd[0]))
+}
 
 console.log('货币')
 if (rates) {
