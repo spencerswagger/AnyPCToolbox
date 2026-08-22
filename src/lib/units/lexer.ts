@@ -19,10 +19,11 @@ export interface Token {
   parts?: TokenPart[]
 }
 
-/** 合并片段：text 为含单位原文（如 "3min"），value 为以合并展示单位为基准的数值 */
+/** 合并片段：text 为含单位原文（如 "3min"），value 为以合并展示单位为基准的数值，unit 为该片段自身单位 */
 export interface TokenPart {
   text: string
   value: number
+  unit: string
 }
 
 // 前置货币符号（多字符优先），最长匹配

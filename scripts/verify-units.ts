@@ -1,7 +1,7 @@
 // 单位换算核心逻辑自检脚本（设计文档约定的验证方式，非单元测试框架）
 // 运行：node scripts/verify-units.ts
 import { tokenize } from '../src/lib/units/lexer.ts'
-import { equivalentsFor, formatValue, mergeTokens } from '../src/lib/units/convert.ts'
+import { directRatio, equivalentsFor, formatValue, mergeTokens } from '../src/lib/units/convert.ts'
 import { equivalentCurrencies, type Rates } from '../src/lib/units/money.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -117,7 +117,10 @@ const mTime = mergeTokens(tokenize('3min20s'))
 check('3min20s → 1 段', mTime.length === 1, String(mTime.length))
 check('3min20s → 合计 200s', mTime[0].unit === 'min' && near((mTime[0].value ?? 0) * 60, 200), JSON.stringify(mTime[0]))
 check('3min20s → raw 合并为 3min20s', mTime[0].raw === '3min20s', mTime[0].raw)
-check('3min20s → parts 2 项且归一为 min', mTime[0].parts?.length === 2 && near(mTime[0].parts[1].value, 20 / 60), JSON.stringify(mTime[0].parts))
+check('3min20s → parts 2 项且归一为 min', mTime[0].parts?.length === 2 && near(mTime[0].parts[1].value, 20 / 60) && mTime[0].parts[1].unit === 's', JSON.stringify(mTime[0].parts))
+check('directRatio(min→s) = 60', near(directRatio('min', 's', 'time') ?? 0, 60), String(directRatio('min', 's', 'time')))
+check('directRatio(t→kg) = 1000', near(directRatio('t', 'kg', 'weight') ?? 0, 1000), String(directRatio('t', 'kg', 'weight')))
+check('directRatio 同单位 = 1', directRatio('s', 's', 'time') === 1)
 const mT = mergeTokens(tokenize('3t200kg'))
 check('3t200kg → 合计 3200kg', mT[0].unit === 't' && near((mT[0].value ?? 0) * 1000, 3200), JSON.stringify(mT[0]))
 check('3t200kg → raw 合并为 3t200kg', mT[0].raw === '3t200kg', mT[0].raw)

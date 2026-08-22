@@ -5,7 +5,7 @@ import { useToaster } from '@/lib/ui/use-toast'
 import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipPortal, TooltipContent } from 'radix-vue'
 import { Copy } from 'lucide-vue-next'
 import { tokenize, type Token } from '@/lib/units/lexer'
-import { equivalentsFor, formatValue, mergeTokens, type EquivResult, type Equivalent } from '@/lib/units/convert'
+import { directRatio, equivalentsFor, formatValue, mergeTokens, type EquivResult, type Equivalent } from '@/lib/units/convert'
 import { allCurrencyCodes, COMMON_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/units/money'
 import { ALIASES, DIMS, UNITS, type Dim, type UnitDef } from '@/lib/units/registry'
 import { loadInitialRates, onRatesUpdate, refreshRatesOnline, RATE_PROVIDER_NAME, RATE_PROVIDER_URL, type RateState } from '@/lib/units/rates'
@@ -149,11 +149,19 @@ const TEMP_FORMULA: Record<string, Record<string, string>> = {
 function directRule(e: Entry, eq: Equivalent): string[] {
   if (eq.noRate) return ['无汇率数据']
   const t = e.token
-  // 合并项：逐片段给出到悬停目标的换算，末尾附合计
+  // 合并项：逐片段给出 1 单位到悬停目标的直接换算比率，同单位跳过，末尾附合计
   if (t.merged && t.parts?.length) {
-    const v = t.value ?? 0
-    const scale = v === 0 ? 0 : eq.value / v
-    const lines = t.parts.map((p) => `${p.text} = ${formatValue(p.value * scale)} ${eq.unit}`)
+    const dim = e.result?.dim
+    const rates = rateState.value?.rates ?? null
+    const lines: string[] = []
+    if (dim) {
+      for (const p of t.parts) {
+        if (p.unit === eq.unit) continue
+        const ratio = directRatio(p.unit, eq.unit, dim, rates)
+        if (ratio === undefined) continue
+        lines.push(`1 ${p.unit} = ${formatValue(ratio)} ${eq.unit}`)
+      }
+    }
     lines.push(`合计 ${formatValue(eq.value)} ${eq.unit}`)
     return lines
   }

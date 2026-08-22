@@ -71,12 +71,31 @@ export function mergeTokens(tokens: Token[], rates?: Rates | null): Token[] {
       prev.parts = []
       prev.merged = true
       prev.raw = firstText
-      prev.parts.push({ text: firstText, value: prev.value - partValue })
+      prev.parts.push({ text: firstText, value: prev.value - partValue, unit: prev.unit })
     }
     prev.raw += frag
-    prev.parts.push({ text: frag, value: partValue })
+    prev.parts.push({ text: frag, value: partValue, unit: t.unit })
   }
   return out
+}
+
+/** 直接换算比率：1 fromUnit = 返回值 toUnit；汇率/系数缺失返回 undefined */
+export function directRatio(
+  fromUnit: string,
+  toUnit: string,
+  dim: Dim,
+  rates?: Rates | null,
+): number | undefined {
+  if (fromUnit === toUnit) return 1
+  if (dim === 'currency') {
+    const r = rates?.rates
+    if (!r || typeof r[fromUnit] !== 'number' || r[fromUnit] <= 0 || typeof r[toUnit] !== 'number' || r[toUnit] <= 0) return undefined
+    return r[toUnit] / r[fromUnit]
+  }
+  const uFrom = findUnit(dim, fromUnit)
+  const uTo = findUnit(dim, toUnit)
+  if (!uFrom?.factor || !uTo?.factor) return undefined
+  return uFrom.factor / uTo.factor
 }
 
 /** 片段 → 该量纲全部等价项；无单位/量纲/无法换算返回 null */
