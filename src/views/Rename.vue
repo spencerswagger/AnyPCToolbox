@@ -144,11 +144,21 @@ function removeDir(path: string) {
   openAllDirs()
 }
 
-/* ---------------- 文件载入（追加而非覆盖，去重） ---------------- */
-function addEntries(newEntries: FileEntry2[]) {
+/* ---------------- 文件载入（追加而非覆盖，去重） ----------------
+ * 去重同时比较相对路径名与物理文件身份：先选文件夹 A、再选其上级文件夹时，
+ * 同一物理文件会以不同相对路径（x.jpg vs A/x.jpg）进入，需靠 handle.isSameEntry 识别并跳过。 */
+async function addEntries(newEntries: FileEntry2[]) {
   if (!newEntries.length) return
-  const seen = new Set(files.value.map((f) => f.name))
-  const toAdd = newEntries.filter((e) => !seen.has(e.name))
+  const dup = await Promise.all(
+    newEntries.map(async (e) => {
+      for (const ex of files.value) {
+        if (ex.name === e.name) return true
+        if (e.handle && ex.handle && (await e.handle.isSameEntry(ex.handle))) return true
+      }
+      return false
+    }),
+  )
+  const toAdd = newEntries.filter((_, i) => !dup[i])
   if (!toAdd.length) return
   files.value = [...files.value, ...toAdd]
   include.value = files.value.map(() => true)
@@ -166,18 +176,18 @@ async function chooseFolder() {
   if (isFsAccess) {
     const res = await pickDirectory()
     if (!res || !res.files.length) return
-    addEntries(res.files.map((e) => ({ name: e.rel, size: e.size, type: e.type, mtime: e.mtime, handle: e.handle, root: res.root })))
+    await addEntries(res.files.map((e) => ({ name: e.rel, size: e.size, type: e.type, mtime: e.mtime, handle: e.handle, root: res.root })))
     return
   }
   folderRef.value?.click()
 }
 
 /** webkitdirectory 只读兜底：递归收集（File.webkitRelativePath 已含子目录） */
-function handleFolderInput(e: Event) {
+async function handleFolderInput(e: Event) {
   const el = e.target as HTMLInputElement
   el.value = ''
   if (!el.files) return
-  addEntries(
+  await addEntries(
     Array.from(el.files).map((f) => ({
       name: (f as File).webkitRelativePath || f.name,
       size: f.size,
@@ -189,13 +199,13 @@ function handleFolderInput(e: Event) {
   )
 }
 
-function handleFileInput(e: Event) {
+async function handleFileInput(e: Event) {
   const el = e.target as HTMLInputElement
   if (!el.files) return
-  addEntries(filesToEntries(el.files).map(fileEntryToModel))
+  await addEntries(filesToEntries(el.files).map(fileEntryToModel))
 }
 
-function onDrop(e: DragEvent) {
+async function onDrop(e: DragEvent) {
   e.preventDefault()
   const dt = e.dataTransfer
   if (!dt) return
@@ -212,7 +222,7 @@ function onDrop(e: DragEvent) {
       if (dirs.length) {
         // 拖入目录：递归收集并带上根句柄（可写盘）
         const entries = await collectFromHandle(dirs[0], '')
-        addEntries(entries.map((e) => ({ name: e.rel, size: e.size, type: e.type, mtime: e.mtime, handle: e.handle, root: dirs[0] })))
+        await addEntries(entries.map((e) => ({ name: e.rel, size: e.size, type: e.type, mtime: e.mtime, handle: e.handle, root: dirs[0] })))
         return
       }
       const f2: FileEntry2[] = []
@@ -224,11 +234,11 @@ function onDrop(e: DragEvent) {
         try { const f = await file.getFile(); mtime = f.lastModified; size = f.size } catch { /* 忽略 */ }
         f2.push({ name: file.name, size, type: '', mtime, handle: file, root: null })
       }
-      addEntries(f2)
+      await addEntries(f2)
     })
     return
   }
-  if (dt.files) handleFileInput({ target: { files: dt.files } } as unknown as Event)
+  if (dt.files) await handleFileInput({ target: { files: dt.files } } as unknown as Event)
 }
 
 async function collectFromHandle(dir: FileSystemDirectoryHandle, rel: string): Promise<{ rel: string; size: number; type: string; mtime: number; handle: FileSystemFileHandle }[]> {
