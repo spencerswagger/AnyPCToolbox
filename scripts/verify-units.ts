@@ -1,7 +1,7 @@
 // 单位换算核心逻辑自检脚本（设计文档约定的验证方式，非单元测试框架）
 // 运行：node scripts/verify-units.ts
 import { tokenize } from '../src/lib/units/lexer.ts'
-import { equivalentsFor, formatValue } from '../src/lib/units/convert.ts'
+import { directRatio, equivalentsFor, formatValue, mergeTokens } from '../src/lib/units/convert.ts'
 import { equivalentCurrencies, type Rates } from '../src/lib/units/money.ts'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -107,9 +107,37 @@ check('1 week → 7 day', near(wk.equivalents.find((e) => e.unit === 'day')?.val
 check('1 week → 604800 s', near(wk.equivalents.find((e) => e.unit === 's')?.value ?? 0, 604800))
 
 console.log('数值展示')
-check('formatValue(3e8) → 3.0e+8', formatValue(3e8) === '3.0e+8', formatValue(3e8))
+check('formatValue(3e8) → 300000000', formatValue(3e8) === '300000000', formatValue(3e8))
 check('formatValue(1000) → 1000', formatValue(1000) === '1000')
 check('formatValue(1/3) → 0.333333', formatValue(1 / 3) === '0.333333', formatValue(1 / 3))
+check('formatValue(1e-9) → 0.000000001', formatValue(1e-9) === '0.000000001', formatValue(1e-9))
+
+console.log('同量纲连续片段合并')
+const mTime = mergeTokens(tokenize('3min20s'))
+check('3min20s → 1 段', mTime.length === 1, String(mTime.length))
+check('3min20s → 合计 200s', mTime[0].unit === 'min' && near((mTime[0].value ?? 0) * 60, 200), JSON.stringify(mTime[0]))
+check('3min20s → raw 合并为 3min20s', mTime[0].raw === '3min20s', mTime[0].raw)
+check('3min20s → parts 2 项且归一为 min', mTime[0].parts?.length === 2 && near(mTime[0].parts[1].value, 20 / 60) && mTime[0].parts[1].unit === 's', JSON.stringify(mTime[0].parts))
+{
+  const mTimeEq = equivalentsFor(mTime[0])!
+  const minRow = mTimeEq.equivalents.find((e) => e.unit === 'min')
+  check('3min20s → 结果含首单位 min 3.33333', Boolean(minRow) && near(minRow?.value ?? 0, 10 / 3), JSON.stringify(minRow))
+  check('3min20s → 结果含 200s', near(mTimeEq.equivalents.find((e) => e.unit === 's')?.value ?? 0, 200))
+}
+check('directRatio(min→s) = 60', near(directRatio('min', 's', 'time') ?? 0, 60), String(directRatio('min', 's', 'time')))
+check('directRatio(t→kg) = 1000', near(directRatio('t', 'kg', 'weight') ?? 0, 1000), String(directRatio('t', 'kg', 'weight')))
+check('directRatio 同单位 = 1', directRatio('s', 's', 'time') === 1)
+const mT = mergeTokens(tokenize('3t200kg'))
+check('3t200kg → 合计 3200kg', mT[0].unit === 't' && near((mT[0].value ?? 0) * 1000, 3200), JSON.stringify(mT[0]))
+check('3t200kg → raw 合并为 3t200kg', mT[0].raw === '3t200kg', mT[0].raw)
+const mMix = mergeTokens(tokenize('30kg 和 $1.99'))
+check('不同量纲不合并 → 2 段', mMix.length === 2, String(mMix.length))
+const mTemp = mergeTokens(tokenize('100℃20℃'))
+check('温度不合并 → 2 段', mTemp.length === 2, String(mTemp.length))
+if (rates) {
+  const mUsd = mergeTokens(tokenize('$3 $5'), rates)
+  check('$3 $5 → 合并 8 USD', mUsd.length === 1 && near(mUsd[0].value ?? 0, 8), JSON.stringify(mUsd[0]))
+}
 
 console.log('货币')
 if (rates) {

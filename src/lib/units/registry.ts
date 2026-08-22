@@ -1,6 +1,7 @@
 // 单位注册表：8 种量纲、别名 → 规范单位、线性/非线性换算因子
 // 换算基准：长度 m / 重量 kg / 数据量 B(1000 进制) / 温度 ℃ / 面积 ㎡ / 体积 L / 时间 s / 货币 USD
 // 货币汇率是运行时数据（见 money.ts），此处仅登记币种别名供词法识别。
+import builtinRatesJson from '../../data/rates.json' with { type: 'json' }
 
 export type Dim = 'length' | 'weight' | 'data' | 'temperature' | 'area' | 'volume' | 'time' | 'currency'
 
@@ -194,6 +195,16 @@ export const ALIASES: Record<string, AliasDef> = {
   CAD: a('CAD', 'currency'), cad: a('CAD', 'currency'), 加元: a('CAD', 'currency'),
   SGD: a('SGD', 'currency'), sgd: a('SGD', 'currency'), 新加坡元: a('SGD', 'currency'),
   CHF: a('CHF', 'currency'), chf: a('CHF', 'currency'), 瑞郎: a('CHF', 'currency'), 瑞士法郎: a('CHF', 'currency'),
+}
+
+// 注册全部 ISO 4217 币种代码（含大小写）供词法识别；代码均为 3 位字母，不与现有 1-2 位单位别名冲突
+const BUILTIN_CODES: Record<string, number> =
+  (builtinRatesJson as { rates?: Record<string, number> }).rates ?? {}
+for (const code of Object.keys(BUILTIN_CODES)) {
+  if (/^[A-Z]{3}$/.test(code)) {
+    ALIASES[code] = { canonical: code, dim: 'currency' }
+    ALIASES[code.toLowerCase()] = { canonical: code, dim: 'currency' }
+  }
 }
 
 export const MAX_ALIAS_LEN: number = Math.max(0, ...Object.keys(ALIASES).map((k) => k.length))

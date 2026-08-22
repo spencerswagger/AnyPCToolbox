@@ -71,20 +71,30 @@ export interface MoneyEquivalent {
   noRate?: boolean
 }
 
-/** 列常用币种等价项；无快照或缺数据 → 全部标注 noRate（value 置 0，前端显示「无汇率数据」） */
+/** 全部币种代码：常用币种（COMMON_CURRENCIES 顺序）在前，其余按代码排序 */
+export function allCurrencyCodes(rates: Rates | null): string[] {
+  if (!rates) return COMMON_CURRENCIES.map((c) => c.code)
+  const common = COMMON_CURRENCIES.map((c) => c.code)
+  const codes = Object.keys(rates.rates)
+  const rest = codes.filter((c) => !common.includes(c)).sort()
+  return [...common.filter((c) => codes.includes(c)), ...rest]
+}
+
+/** 列全部币种等价项：常用币种在前（缺数据标 noRate），其余按代码追加；前端默认展示前 10 条，可展开 */
 export function equivalentCurrencies(
   value: number,
   from: string,
   rates: Rates | null,
 ): MoneyEquivalent[] {
-  const markAllNoRate = (): MoneyEquivalent[] =>
-    COMMON_CURRENCIES.map((c) => ({ unit: c.code, name: c.name, value: 0, noRate: true }))
-
-  if (!rates) return markAllNoRate()
+  const common = COMMON_CURRENCIES.map((c) => c.code)
+  if (!rates) {
+    return common.map((code) => ({ unit: code, name: currencyName(code), value: 0, noRate: true }))
+  }
   const usd = toUsd(value, from, rates)
-  if (usd === null) return markAllNoRate()
-  return COMMON_CURRENCIES.filter((c) => c.code !== from).map((c) => {
-    const v = fromUsd(usd, c.code, rates)
-    return { unit: c.code, name: c.name, value: v === null ? 0 : v, noRate: v === null }
+  const rest = allCurrencyCodes(rates).filter((c) => !common.includes(c) && c !== from)
+  const codes = [...common.filter((c) => c !== from), ...rest]
+  return codes.map((code) => {
+    const v = usd === null ? null : fromUsd(usd, code, rates)
+    return { unit: code, name: currencyName(code), value: v === null ? 0 : v, noRate: v === null }
   })
 }
