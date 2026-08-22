@@ -1,11 +1,10 @@
-// 极简 IndexedDB 封装：存汇率快照（key units:rates，TTL 24h）
+// 极简 IndexedDB 封装：存汇率快照（key units:rates，缓存不过期，在线刷新时覆盖）
 import type { Rates } from './money.ts'
 
 const DB_NAME = 'anypctoolbox'
 const DB_VERSION = 1
 const STORE = 'kv'
 const KEY = 'units:rates'
-const TTL_MS = 24 * 60 * 60 * 1000
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -39,12 +38,11 @@ export async function idbSet(key: string, value: unknown): Promise<void> {
   })
 }
 
-/** 读缓存汇率：存在且未超 TTL 才返回；任何异常静默返回 null */
+/** 读缓存汇率：存在即返回（不过期）；任何异常静默返回 null */
 export async function readCachedRates(): Promise<Rates | null> {
   try {
     const v = await idbGet<Rates>(KEY)
     if (!v || typeof v._fetchedAt !== 'number') return null
-    if (Date.now() - v._fetchedAt > TTL_MS) return null
     return v
   } catch {
     return null

@@ -3,8 +3,8 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToaster } from '@/lib/ui/use-toast'
 import { tokenize, type Token } from '@/lib/units/lexer'
-import { equivalentsFor, formatValue, type EquivResult } from '@/lib/units/convert'
-import { COMMON_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/units/money'
+import { equivalentsFor, formatValue, type EquivResult, type Equivalent } from '@/lib/units/convert'
+import { allCurrencyCodes, COMMON_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/units/money'
 import { ALIASES, DIMS, UNITS, type Dim, type UnitDef } from '@/lib/units/registry'
 import { loadInitialRates, onRatesUpdate, refreshRatesOnline, RATE_PROVIDER_NAME, RATE_PROVIDER_URL, type RateState } from '@/lib/units/rates'
 
@@ -28,6 +28,39 @@ const unrecognizedCount = computed(() => tokens.value.length - recognizedCount.v
 
 // ---- 单位匹配与换算规则详表（折叠，默认收起） ----
 const showRules = ref(false)
+
+/** 默认展示条数，超过的部分点击展开 */
+const MAX_SHOW = 10
+
+// 片段结果展开态（按结果卡片下标）
+const expandedEntries = ref<number[]>([])
+// 规则详表展开态（按量纲）
+const expandedSections = ref<Dim[]>([])
+
+function isExpandable(e: Entry): boolean {
+  return e.result?.dim === 'currency' && (e.result?.equivalents.length ?? 0) > MAX_SHOW
+}
+function isExpanded(i: number): boolean {
+  return expandedEntries.value.includes(i)
+}
+function visibleEquivs(e: Entry, i: number): Equivalent[] {
+  const list = e.result?.equivalents ?? []
+  if (!isExpandable(e) || isExpanded(i)) return list
+  return list.slice(0, MAX_SHOW)
+}
+function toggleExpand(i: number): void {
+  const arr = expandedEntries.value
+  expandedEntries.value = arr.includes(i) ? arr.filter((x) => x !== i) : [...arr, i]
+}
+
+function visibleRefUnits(s: RefSection): RefUnit[] {
+  if (s.units.length <= MAX_SHOW || expandedSections.value.includes(s.id)) return s.units
+  return s.units.slice(0, MAX_SHOW)
+}
+function toggleRefSection(id: Dim): void {
+  const arr = expandedSections.value
+  expandedSections.value = arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]
+}
 
 interface RefUnit {
   canonical: string
@@ -62,13 +95,14 @@ function unitRule(u: UnitDef, base: string): string {
 const referenceSections = computed<RefSection[]>(() =>
   DIMS.map((d) => {
     if (d.id === 'currency') {
-      const units: RefUnit[] = COMMON_CURRENCIES.map((c) => {
-        const sym = CURRENCY_SYMBOLS.find((s) => s.code === c.code)
+      const units: RefUnit[] = allCurrencyCodes(rateState.value?.rates ?? null).map((code) => {
+        const info = COMMON_CURRENCIES.find((c) => c.code === code)
+        const sym = CURRENCY_SYMBOLS.find((s) => s.code === code)
         const names = Object.keys(ALIASES).filter(
-          (k) => ALIASES[k].dim === 'currency' && ALIASES[k].canonical === c.code,
+          (k) => ALIASES[k].dim === 'currency' && ALIASES[k].canonical === code,
         )
         const aliases = [...(sym ? [sym.symbols] : []), ...names].join('、')
-        return { canonical: c.code, name: c.name, aliases, rule: '汇率换算（基准 USD）' }
+        return { canonical: code, name: info?.name ?? code, aliases, rule: '汇率换算（基准 USD）' }
       })
       return { id: d.id, label: d.label, base: d.base, units }
     }
@@ -199,7 +233,7 @@ function sourceHost(url: string): string {
           暂不支持该量纲换算
         </div>
         <ul v-else class="divide-y">
-          <li v-for="eq in e.result.equivalents" :key="eq.unit" class="flex items-center gap-2 px-4 py-2 text-sm">
+          <li v-for="eq in visibleEquivs(e, i)" :key="eq.unit" class="flex items-center gap-2 px-4 py-2 text-sm">
             <span class="w-40 shrink-0 text-muted-foreground">{{ eq.name }}（{{ eq.unit }}）</span>
             <span v-if="eq.noRate" class="text-muted-foreground">无汇率数据</span>
             <span v-else class="font-mono">{{ formatValue(eq.value) }}</span>
@@ -213,6 +247,13 @@ function sourceHost(url: string): string {
             </button>
           </li>
         </ul>
+        <button
+          v-if="isExpandable(e)"
+          class="block w-full border-t px-4 py-2 text-xs text-primary outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+          @click="toggleExpand(i)"
+        >
+          {{ isExpanded(i) ? '收起' : `展开全部 ${e.result?.equivalents.length ?? 0} 种币种` }}
+        </button>
         <div v-if="e.result?.note" class="border-t px-4 py-2 text-xs text-muted-foreground">
           {{ e.result.note }}
         </div>
@@ -245,7 +286,7 @@ function sourceHost(url: string): string {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="u in s.units" :key="u.canonical" class="hover:bg-muted/50">
+                <tr v-for="u in visibleRefUnits(s)" :key="u.canonical" class="hover:bg-muted/50">
                   <td class="border p-2 font-mono">{{ u.canonical }}</td>
                   <td class="border p-2">{{ u.name }}</td>
                   <td class="border p-2 max-w-xs truncate">{{ u.aliases }}</td>
@@ -254,9 +295,13 @@ function sourceHost(url: string): string {
               </tbody>
             </table>
           </div>
-          <p v-if="s.id === 'currency'" class="mt-1 text-xs text-muted-foreground">
-            支持全部 ISO 4217 币种（如 KRW、INR 等），汇率均以 USD 为基准换算。
-          </p>
+          <button
+            v-if="s.units.length > MAX_SHOW"
+            class="mt-2 flex w-full items-center justify-center rounded-md border py-1.5 text-xs text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            @click="toggleRefSection(s.id)"
+          >
+            {{ expandedSections.includes(s.id) ? '收起' : `展开全部 ${s.units.length} 种` }}
+          </button>
         </div>
       </div>
     </div>
