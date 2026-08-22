@@ -1,6 +1,19 @@
 // 单位换算核心逻辑自检脚本（设计文档约定的验证方式，非单元测试框架）
 // 运行：node scripts/verify-units.ts
 import { tokenize } from '../src/lib/units/lexer.ts'
+import { equivalentsFor, formatValue } from '../src/lib/units/convert.ts'
+import { equivalentCurrencies, type Rates } from '../src/lib/units/money.ts'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const here = dirname(fileURLToPath(import.meta.url))
+let rates: Rates | null = null
+try {
+  rates = JSON.parse(readFileSync(join(here, '../src/data/rates.json'), 'utf8')) as Rates
+} catch {
+  // 允许缺快照：货币快照断言会跳过
+}
 
 let failed = 0
 function check(name: string, cond: boolean, detail = ''): void {
@@ -62,6 +75,72 @@ check('1.2.3 → 无法识别', Boolean(err), err?.error)
 
 const multi = tokenize('30kg 和 $1.99')
 check('多片段 30kg 和 $1.99 → 2 段', multi.length === 2 && multi[0].dim === 'weight' && multi[1].dim === 'currency', String(multi.length))
+
+console.log('量纲换算')
+const mi = equivalentsFor(single('1 mi'))!
+check('1 mi → 1609.344 m', near(mi.equivalents.find((e) => e.unit === 'm')?.value ?? 0, 1609.344))
+check('1 mi 量纲 length', mi.dim === 'length')
+
+const jin = equivalentsFor(single('1 斤'))!
+check('1 斤 → 500 g', near(jin.equivalents.find((e) => e.unit === 'g')?.value ?? 0, 500))
+check('1 斤 → 0.5 kg', near(jin.equivalents.find((e) => e.unit === 'kg')?.value ?? 0, 0.5))
+
+const gb = equivalentsFor(single('1 GB'))!
+check('1 GB → 1000 MB', near(gb.equivalents.find((e) => e.unit === 'MB')?.value ?? 0, 1000))
+check('1 GB → 1e9 B', near(gb.equivalents.find((e) => e.unit === 'B')?.value ?? 0, 1e9))
+
+console.log('温度（基于公式换算）')
+const c = equivalentsFor(single('100℃'))!
+check('100℃ → 212℉', near(c.equivalents.find((e) => e.unit === '℉')?.value ?? 0, 212))
+check('100℃ → 373.15K', near(c.equivalents.find((e) => e.unit === 'K')?.value ?? 0, 373.15))
+check('100℃ 标注基于公式换算', c.note === '基于公式换算')
+const f = equivalentsFor(single('212℉'))!
+check('212℉ round-trip → 100℃', near(f.equivalents.find((e) => e.unit === '℃')?.value ?? 0, 100))
+
+console.log('面积 / 体积 / 时间')
+const mu = equivalentsFor(single('1 亩'))!
+check('1 亩 → 666.67 ㎡', near(mu.equivalents.find((e) => e.unit === '㎡')?.value ?? 0, 2000 / 3))
+const gal = equivalentsFor(single('1 gal'))!
+check('1 gal → 3.7854 L', near(gal.equivalents.find((e) => e.unit === 'L')?.value ?? 0, 3.785411784))
+const wk = equivalentsFor(single('1 week'))!
+check('1 week → 7 day', near(wk.equivalents.find((e) => e.unit === 'day')?.value ?? 0, 7))
+check('1 week → 604800 s', near(wk.equivalents.find((e) => e.unit === 's')?.value ?? 0, 604800))
+
+console.log('数值展示')
+check('formatValue(3e8) → 3.0e+8', formatValue(3e8) === '3.0e+8', formatValue(3e8))
+check('formatValue(1000) → 1000', formatValue(1000) === '1000')
+check('formatValue(1/3) → 0.333333', formatValue(1 / 3) === '0.333333', formatValue(1 / 3))
+
+console.log('货币')
+if (rates) {
+  const usdTok = single('$1.99')
+  const usdEq = equivalentsFor(usdTok, rates)!
+  const cny = usdEq.equivalents.find((e) => e.unit === 'CNY')
+  check('$1.99 → CNY 用快照汇率', Boolean(cny && near(cny.value, 1.99 * (rates.rates.CNY ?? 0))), String(cny?.value))
+
+  const y100 = single('¥100')
+  check('¥100 → 币种 CNY', y100.unit === 'CNY' && y100.dim === 'currency')
+  const yEq = equivalentsFor(y100, rates)!
+  const usd = yEq.equivalents.find((e) => e.unit === 'USD')
+  check('¥100 → USD 用快照汇率', Boolean(usd && near(usd.value, 100 / (rates.rates.CNY ?? 1))), String(usd?.value))
+
+  const jpy100 = single('JP¥100')
+  check('JP¥100 → 币种 JPY', jpy100.unit === 'JPY' && jpy100.dim === 'currency')
+  const jpEq = equivalentsFor(jpy100, rates)!
+  const usd2 = jpEq.equivalents.find((e) => e.unit === 'USD')
+  check('JP¥100 → USD 用快照汇率', Boolean(usd2 && near(usd2.value, 100 / (rates.rates.JPY ?? 1))), String(usd2?.value))
+} else {
+  console.log('  ⚠ 无 rates.json，跳过货币快照断言（Task 6 后再跑）')
+}
+
+console.log('货币：无汇率数据标注')
+const noRates = equivalentCurrencies(7, 'CNY', null)
+check('无快照 → 全部标注无汇率数据', noRates.length === 10 && noRates.every((e) => e.noRate === true))
+const partial: Rates = { base: 'USD', rates: { USD: 1, CNY: 7 } }
+const withMissing = equivalentCurrencies(7, 'CNY', partial)
+check('缺 JPY 数据 → JPY 标注无汇率数据', Boolean(withMissing.find((e) => e.unit === 'JPY')?.noRate))
+const usdItem = withMissing.find((e) => e.unit === 'USD')
+check('有 USD 数据 → 正常换算 1 USD', Boolean(usdItem && near(usdItem.value, 1)), String(usdItem?.value))
 
 console.log(failed === 0 ? '\n全部通过' : `\n${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)
