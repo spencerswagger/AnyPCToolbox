@@ -232,21 +232,25 @@ function sourceHost(url: string): string {
         <div v-else-if="!e.result" class="px-4 py-3 text-sm text-muted-foreground">
           暂不支持该量纲换算
         </div>
-        <ul v-else class="divide-y">
-          <li v-for="eq in visibleEquivs(e, i)" :key="eq.unit" class="flex items-center gap-2 px-4 py-2 text-sm">
-            <span class="w-40 shrink-0 text-muted-foreground">{{ eq.name }}（{{ eq.unit }}）</span>
-            <span v-if="eq.noRate" class="text-muted-foreground">无汇率数据</span>
-            <span v-else class="font-mono">{{ formatValue(eq.value) }}</span>
-            <span v-if="eq.approx" class="rounded bg-accent px-1.5 py-0.5 text-xs text-muted-foreground">近似</span>
+        <div v-else class="grid gap-2 p-4 grid-cols-[repeat(auto-fill,minmax(230px,1fr))]">
+          <div
+            v-for="eq in visibleEquivs(e, i)"
+            :key="eq.unit"
+            class="flex items-center gap-2 rounded-md border bg-card/50 px-3 py-2 text-sm"
+          >
+            <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ eq.name }}（{{ eq.unit }}）</span>
+            <span v-if="eq.noRate" class="shrink-0 text-xs text-muted-foreground">无汇率数据</span>
+            <span v-else class="shrink-0 font-mono">{{ formatValue(eq.value) }}</span>
+            <span v-if="eq.approx" class="shrink-0 rounded bg-accent px-1.5 py-0.5 text-xs text-muted-foreground">近似</span>
             <button
               v-if="!eq.noRate"
-              class="ml-auto shrink-0 rounded px-2 py-0.5 text-xs text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              class="shrink-0 rounded px-2 py-0.5 text-xs text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               @click="copyValue(formatValue(eq.value))"
             >
               复制
             </button>
-          </li>
-        </ul>
+          </div>
+        </div>
         <button
           v-if="isExpandable(e)"
           class="block w-full border-t px-4 py-2 text-xs text-primary outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
