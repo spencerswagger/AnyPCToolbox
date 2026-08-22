@@ -146,25 +146,26 @@ const TEMP_FORMULA: Record<string, Record<string, string>> = {
   K: { '℃': '℃ = K − 273.15', '℉': '℉ = K × 9/5 − 459.67' },
 }
 
-function directRule(e: Entry, eq: Equivalent): string {
-  if (eq.noRate) return '无汇率数据'
+function directRule(e: Entry, eq: Equivalent): string[] {
+  if (eq.noRate) return ['无汇率数据']
   const t = e.token
-  // 合并项：逐片段给出到悬停目标的换算，并附合计
+  // 合并项：逐片段给出到悬停目标的换算，末尾附合计
   if (t.merged && t.parts?.length) {
     const v = t.value ?? 0
     const scale = v === 0 ? 0 : eq.value / v
-    const items = t.parts.map((p) => `${p.text} = ${formatValue(p.value * scale)} ${eq.unit}`)
-    return `${items.join('；')}；合计 ${formatValue(eq.value)} ${eq.unit}`
+    const lines = t.parts.map((p) => `${p.text} = ${formatValue(p.value * scale)} ${eq.unit}`)
+    lines.push(`合计 ${formatValue(eq.value)} ${eq.unit}`)
+    return lines
   }
   const src = t.unit ?? ''
   if (e.result?.dim === 'temperature') {
     const f = TEMP_FORMULA[src]?.[eq.unit]
-    return f ? `公式：${f}` : '基准单位'
+    return [f ? `公式：${f}` : '基准单位']
   }
   const v = t.value
-  if (v === undefined) return `1 ${src} = ${formatValue(eq.value)} ${eq.unit}`
-  if (v === 0) return `0 ${src} = ${formatValue(eq.value)} ${eq.unit}`
-  return `1 ${src} = ${formatValue(eq.value / v)} ${eq.unit}`
+  if (v === undefined) return [`1 ${src} = ${formatValue(eq.value)} ${eq.unit}`]
+  if (v === 0) return [`0 ${src} = ${formatValue(eq.value)} ${eq.unit}`]
+  return [`1 ${src} = ${formatValue(eq.value / v)} ${eq.unit}`]
 }
 
 // ---- 汇率链 ----
@@ -288,7 +289,9 @@ function sourceHost(url: string): string {
                 side="bottom"
                 class="z-50 max-w-xs rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
               >
-                {{ directRule(e, eq) }}
+                <div class="space-y-0.5">
+                  <p v-for="(line, li) in directRule(e, eq)" :key="li">{{ line }}</p>
+                </div>
               </TooltipContent>
             </TooltipPortal>
           </TooltipRoot>
