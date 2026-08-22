@@ -1,4 +1,4 @@
-import type { Cell, Records } from '../records'
+import type { Cell, Records } from '../records.ts'
 
 function csvField(v: Cell): string {
   if (v === null) return ''

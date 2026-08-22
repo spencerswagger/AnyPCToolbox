@@ -1,4 +1,4 @@
-import { buildRecords, type Cell } from '../records'
+import { buildRecords, type Cell } from '../records.ts'
 
 function parseCsv(text: string): string[][] {
   const rows: string[][] = []

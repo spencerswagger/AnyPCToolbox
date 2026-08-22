@@ -1,5 +1,5 @@
 import { parse } from 'yaml'
-import { FormatError, valueToRecords, type FlattenStrategy } from '../records'
+import { FormatError, valueToRecords, type FlattenStrategy } from '../records.ts'
 
 export function yamlToRecords(text: string, strategy: FlattenStrategy = 'flatten') {
   let value: unknown

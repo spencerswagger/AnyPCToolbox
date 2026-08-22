@@ -1,4 +1,4 @@
-import { FormatError, valueToRecords, type FlattenStrategy } from '../records'
+import { FormatError, valueToRecords, type FlattenStrategy } from '../records.ts'
 
 export function jsonToRecords(text: string, strategy: FlattenStrategy = 'flatten') {
   let value: unknown
