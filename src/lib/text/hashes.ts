@@ -24,20 +24,17 @@ export async function computeHashes(input: string): Promise<HashItem[]> {
   const items: HashItem[] = [
     { id: 'md5', label: 'MD5', value: md5(input) },
     { id: 'crc32', label: 'CRC32', value: crc32hex(input) },
+    { id: 'sha1', label: 'SHA-1', value: '' },
+    { id: 'sha256', label: 'SHA-256', value: '' },
+    { id: 'sha512', label: 'SHA-512', value: '' },
   ]
   try {
-    const sha1 = await sha256(input, 'SHA-1')
-    const sha256v = await sha256(input, 'SHA-256')
-    const sha512 = await sha256(input, 'SHA-512')
-    items.push(
-      { id: 'sha1', label: 'SHA-1', value: sha1 },
-      { id: 'sha256', label: 'SHA-256', value: sha256v },
-      { id: 'sha512', label: 'SHA-512', value: sha512 },
-    )
+    items[2].value = await sha256(input, 'SHA-1')
+    items[3].value = await sha256(input, 'SHA-256')
+    items[4].value = await sha256(input, 'SHA-512')
   } catch {
-    for (const id of ['sha1', 'sha256', 'sha512']) {
-      const it = items.find((x) => x.id === id)
-      if (it) it.error = '计算失败'
+    for (const it of items) {
+      if (it.id.startsWith('sha') && !it.value) it.error = '计算失败'
     }
   }
   return items
@@ -110,34 +107,9 @@ class Md5Ctx {
     const dv = new DataView(tail.buffer)
     dv.setUint32(tail.length - 8, bitLen >>> 0, true)
     dv.setUint32(tail.length - 4, Math.floor(bitLen / 0x100000000), true)
-    const m = new DataView(tail.buffer)
+    // 复用 process()（内部用 block.byteOffset 正确读块），避免长度 %64 ∈ [56,63] 时读错数据
     for (let i = 0; i < tail.length; i += 64) {
-      let a = this.a,
-        b = this.b,
-        c = this.c,
-        d = this.d
-      for (let j = 0; j < 64; j++) {
-        let f: number, g: number
-        if (j < 16) {
-          f = (b & c) | (~b & d)
-          g = j
-        } else if (j < 32) {
-          f = (d & b) | (~d & c)
-          g = (5 * j + 1) % 16
-        } else if (j < 48) {
-          f = b ^ c ^ d
-          g = (3 * j + 5) % 16
-        } else {
-          f = c ^ (b | ~d)
-          g = (7 * j) % 16
-        }
-        const t = (a + f + K[j] + m.getUint32(g * 4, true)) | 0
-        ;(a = d), (d = c), (c = b), (b = (b + rol32(t, S[j])) | 0)
-      }
-      this.a = (this.a + a) | 0
-      this.b = (this.b + b) | 0
-      this.c = (this.c + c) | 0
-      this.d = (this.d + d) | 0
+      this.process(tail.subarray(i, i + 64))
     }
     return toHexLE([this.a, this.b, this.c, this.d])
   }
