@@ -10,11 +10,11 @@ const tools = [
     tag: 'v1.0',
   },
   {
-    icon: '🧾',
-    name: 'JSON 编辑器',
-    description: '格式化、校验与预览 JSON 数据，错误定位一目了然',
+    icon: '🔄',
+    name: '结构化数据互转',
+    description: 'JSON/YAML/CSV/TOML/XML 互转，校验、预览表格、列调整与导出',
     route: '/json',
-    tag: 'v1.0',
+    tag: 'v2.0',
   },
   {
     icon: '🪪',
