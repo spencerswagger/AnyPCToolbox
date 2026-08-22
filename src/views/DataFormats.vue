@@ -123,10 +123,11 @@ function resetColumns() {
 }
 
 function handleReverse() {
+  const prevTarget = targetText.value
   const s = sourceFormatId.value
   sourceFormatId.value = targetFormatId.value
   targetFormatId.value = s
-  sourceText.value = targetText.value
+  sourceText.value = prevTarget
   resetColumns()
 }
 
