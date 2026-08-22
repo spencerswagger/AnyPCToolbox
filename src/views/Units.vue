@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToaster } from '@/lib/ui/use-toast'
+import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipPortal, TooltipContent } from 'radix-vue'
+import { Copy } from 'lucide-vue-next'
 import { tokenize, type Token } from '@/lib/units/lexer'
 import { equivalentsFor, formatValue, type EquivResult, type Equivalent } from '@/lib/units/convert'
 import { allCurrencyCodes, COMMON_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/units/money'
@@ -99,7 +101,7 @@ const referenceSections = computed<RefSection[]>(() =>
         const info = COMMON_CURRENCIES.find((c) => c.code === code)
         const sym = CURRENCY_SYMBOLS.find((s) => s.code === code)
         const names = Object.keys(ALIASES).filter(
-          (k) => ALIASES[k].dim === 'currency' && ALIASES[k].canonical === code,
+          (k) => ALIASES[k].dim === 'currency' && ALIASES[k].canonical === code && !/^[A-Za-z]{3}$/.test(k),
         )
         const aliases = [...(sym ? [sym.symbols] : []), ...names].join('、')
         return { canonical: code, name: info?.name ?? code, aliases, rule: '汇率换算（基准 USD）' }
@@ -134,6 +136,36 @@ async function copyValue(text: string): Promise<void> {
   } catch {
     toast(undefined, '复制失败')
   }
+}
+
+// ---- 悬停 tooltip：匹配规则 + 直接换算规则 ----
+function matchText(e: Entry): string {
+  const t = e.token
+  const dimLabel = e.result?.dimLabel ?? ''
+  const sourceName = e.result?.sourceName ?? ''
+  if (t.symbol) return `符号 ${t.symbol} → ${t.unit ?? ''}（${dimLabel}）`
+  if (t.unit) return `${t.unit} 匹配为 ${sourceName}（${dimLabel}）`
+  return dimLabel
+}
+
+// 温度非线性：无固定比率，按 源单位 → 目标单位 给出换算公式
+const TEMP_FORMULA: Record<string, Record<string, string>> = {
+  '℃': { '℉': '℉ = ℃ × 9/5 + 32', K: 'K = ℃ + 273.15' },
+  '℉': { '℃': '℃ = (℉ − 32) × 5/9', K: 'K = (℉ + 459.67) × 5/9' },
+  K: { '℃': '℃ = K − 273.15', '℉': '℉ = K × 9/5 − 459.67' },
+}
+
+function directRule(e: Entry, eq: Equivalent): string {
+  if (eq.noRate) return '无汇率数据'
+  const src = e.token.unit ?? ''
+  if (e.result?.dim === 'temperature') {
+    const f = TEMP_FORMULA[src]?.[eq.unit]
+    return f ? `公式：${f}` : '基准单位'
+  }
+  const v = e.token.value
+  if (v === undefined) return `1 ${src} = ${formatValue(eq.value)} ${eq.unit}`
+  if (v === 0) return `0 ${src} = ${formatValue(eq.value)} ${eq.unit}`
+  return `1 ${src} = ${formatValue(eq.value / v)} ${eq.unit}`
 }
 
 // ---- 汇率链 ----
@@ -171,6 +203,7 @@ function sourceHost(url: string): string {
 </script>
 
 <template>
+  <TooltipProvider>
   <div class="space-y-6">
     <!-- 顶栏 -->
     <div class="flex items-center gap-2">
@@ -233,23 +266,36 @@ function sourceHost(url: string): string {
           暂不支持该量纲换算
         </div>
         <div v-else class="grid gap-2 p-4 grid-cols-[repeat(auto-fill,minmax(230px,1fr))]">
-          <div
-            v-for="eq in visibleEquivs(e, i)"
-            :key="eq.unit"
-            class="flex items-center gap-2 rounded-md border bg-card/50 px-3 py-2 text-sm"
-          >
-            <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ eq.name }}（{{ eq.unit }}）</span>
-            <span v-if="eq.noRate" class="shrink-0 text-xs text-muted-foreground">无汇率数据</span>
-            <span v-else class="shrink-0 font-mono">{{ formatValue(eq.value) }}</span>
-            <span v-if="eq.approx" class="shrink-0 rounded bg-accent px-1.5 py-0.5 text-xs text-muted-foreground">近似</span>
-            <button
-              v-if="!eq.noRate"
-              class="shrink-0 rounded px-2 py-0.5 text-xs text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              @click="copyValue(formatValue(eq.value))"
-            >
-              复制
-            </button>
-          </div>
+          <TooltipRoot v-for="eq in visibleEquivs(e, i)" :key="eq.unit">
+            <TooltipTrigger as-child>
+              <div
+                class="flex cursor-default items-center gap-2 rounded-md border bg-card/50 px-3 py-2 text-sm"
+              >
+                <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ eq.name }}（{{ eq.unit }}）</span>
+                <span v-if="eq.noRate" class="shrink-0 text-xs text-muted-foreground">无汇率数据</span>
+                <span v-else class="shrink-0 font-mono">{{ formatValue(eq.value) }}</span>
+                <span v-if="eq.approx" class="shrink-0 rounded bg-accent px-1.5 py-0.5 text-xs text-muted-foreground">近似</span>
+                <button
+                  v-if="!eq.noRate"
+                  class="shrink-0 rounded p-1 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  @click="copyValue(formatValue(eq.value))"
+                >
+                  <Copy class="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </TooltipTrigger>
+            <TooltipPortal>
+              <TooltipContent
+                side="bottom"
+                class="z-50 max-w-xs rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
+              >
+                <div class="space-y-1">
+                  <p><span class="font-medium">匹配规则：</span>{{ matchText(e) }}</p>
+                  <p><span class="font-medium">换算规则：</span>{{ directRule(e, eq) }}</p>
+                </div>
+              </TooltipContent>
+            </TooltipPortal>
+          </TooltipRoot>
         </div>
         <button
           v-if="isExpandable(e)"
@@ -333,4 +379,5 @@ function sourceHost(url: string): string {
       <span>识别 {{ recognizedCount }} 段 · 无法识别 {{ unrecognizedCount }} 段</span>
     </div>
   </div>
+  </TooltipProvider>
 </template>
