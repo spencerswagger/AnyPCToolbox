@@ -189,7 +189,7 @@ function flashStatus(msg: string): void {
                 {{ item.label }}
               </button>
             </div>
-            <div v-if="!input" class="flex flex-1 items-center justify-center p-4 text-sm text-muted-foreground">
+            <div v-if="!input.trim()" class="flex flex-1 items-center justify-center p-4 text-sm text-muted-foreground">
               输入文本后，此处实时显示 {{ currentItem.label }} 结果
             </div>
             <div v-else class="flex-1 overflow-auto p-3">
