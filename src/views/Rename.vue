@@ -6,7 +6,7 @@ import RuleBlock from '@/components/rename/RuleBlock.vue'
 import { createRule, RULE_TYPES, type Rule, type RuleType } from '@/lib/rename/rules'
 import { batchPreview, type FileEntry2 } from '@/lib/rename/preview'
 import { diffSegments } from '@/lib/rename/diff'
-import { detectFsAccess, pickDirectory, commitRenames, revertBatch } from '@/lib/rename/fsaccess'
+import { detectFsAccess, pickDirectory, commitRenames, revertBatch, filesToEntries } from '@/lib/rename/fsaccess'
 import { popHistory } from '@/lib/rename/history'
 
 const router = useRouter()
@@ -21,12 +21,7 @@ const autoNumber = ref(false)
 const undoAvailable = ref(false)
 const addType = ref<RuleType>('replace')
 
-const rows = computed(() =>
-  batchPreview(files.value, rules.value, { autoNumber: autoNumber.value }).map((row, i) => ({
-    ...row,
-    skipped: !include.value[i],
-  })),
-)
+const rows = computed(() => batchPreview(files.value, rules.value, { autoNumber: autoNumber.value }))
 
 const stats = computed(() => {
   const vis = rows.value.filter((_, i) => include.value[i])
@@ -50,12 +45,10 @@ async function handlePick() {
 function handleFileInput(e: Event) {
   const el = e.target as HTMLInputElement
   if (!el.files) return
-  const f2: FileEntry2[] = Array.from(el.files).map((f) => ({
-    name: f.name, size: f.size, type: f.type, mtime: f.lastModified || Date.now(), handle: null,
-  }))
   dirHandle.value = null
-  files.value = f2
-  include.value = f2.map(() => true)
+  files.value = filesToEntries(el.files)
+  include.value = files.value.map(() => true)
+  undoAvailable.value = false
 }
 
 // 拖拽：FS Access 支持时取目录/文件句柄；否则回退 DataTransfer.files
@@ -64,10 +57,29 @@ function onDrop(e: DragEvent) {
   const dt = e.dataTransfer
   if (!dt) return
   if (isFsAccess && [...dt.items].some((it) => it.kind === 'file')) {
-    const item = [...dt.items].find((it) => it.kind === 'file')
-    item?.getAsFileSystemHandle().then((h) => {
-      if (h?.kind === 'directory') setFromDir(h as FileSystemDirectoryHandle)
-      else if (h?.kind === 'file') { dirHandle.value = null; files.value = [{ name: h.name, size: 0, type: '', mtime: Date.now(), handle: h as FileSystemFileHandle }]; include.value = [true] }
+    const items = [...dt.items].filter((it) => it.kind === 'file')
+    const dirs: FileSystemDirectoryHandle[] = []
+    Promise.all(
+      items.map((it) =>
+        it.getAsFileSystemHandle().then((h) => {
+          if (h?.kind === 'directory') dirs.push(h as FileSystemDirectoryHandle)
+        }),
+      ),
+    ).then(async () => {
+      if (dirs.length) { await setFromDir(dirs[0]); return }
+      const f2: FileEntry2[] = []
+      for (const fh of items) {
+        const h = await fh.getAsFileSystemHandle()
+        if (!h || h.kind !== 'file') continue
+        const file = h as FileSystemFileHandle
+        let mtime = Date.now(); let size = 0
+        try { const f = await file.getFile(); mtime = f.lastModified; size = f.size } catch { /* 忽略 */ }
+        f2.push({ name: file.name, size, type: '', mtime, handle: file })
+      }
+      dirHandle.value = null
+      files.value = f2
+      include.value = f2.map(() => true)
+      undoAvailable.value = false
     })
     return
   }
@@ -86,6 +98,7 @@ async function setFromDir(dir: FileSystemDirectoryHandle) {
   }
   files.value = out
   include.value = out.map(() => true)
+  undoAvailable.value = false
 }
 
 function removeFile(i: number) {
@@ -111,7 +124,18 @@ async function applyChanges() {
     .map((r) => ({ oldName: r.old, newName: r.new }))
   if (!targets.length) return
   const res = await commitRenames(dirHandle.value, targets)
-  if (res.failed.length) { toast(undefined, `部分失败：${res.failed.join(', ')}`); return }
+  const failedSet = new Set(res.failed)
+  if (res.failed.length) {
+    // 部分成功：同步成功项到本地，并允许撤销已写入历史的成功子集
+    rows.value.forEach((r, i) => {
+      if (include.value[i] && r.changed && !r.invalid && !failedSet.has(r.old)) {
+        files.value[i] = { ...files.value[i], name: r.new }
+      }
+    })
+    undoAvailable.value = true
+    toast(undefined, `部分失败：${res.failed.join(', ')}`)
+    return
+  }
   undoAvailable.value = true
   rows.value.forEach((r, i) => {
     if (include.value[i] && r.changed && !r.invalid) files.value[i] = { ...files.value[i], name: r.new }
@@ -139,6 +163,11 @@ async function undo() {
   const batch = await popHistory()
   if (!batch) { toast(undefined, '无撤销记录'); return }
   const failed = await revertBatch(batch.dir, batch.ops)
+  // 本地列表与磁盘同步回原名
+  batch.ops.forEach((op) => {
+    const idx = files.value.findIndex((f) => f.name === op.newName)
+    if (idx >= 0) files.value[idx] = { ...files.value[idx], name: op.oldName }
+  })
   undoAvailable.value = false
   toast(undefined, failed.length ? `撤销部分失败：${failed.join(', ')}` : '已撤销')
 }
@@ -173,7 +202,7 @@ async function undo() {
         <li v-for="(f, i) in files" :key="i" class="flex items-center gap-2 px-3 py-1.5 text-sm">
           <span class="truncate">{{ f.name }}</span>
           <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ f.size != null ? (f.size / 1024).toFixed(1) + ' KB' : '' }}<span class="mx-0.5">·</span>{{ f.type || '文件' }}</span>
-          <button type="button" class="shrink-0 rounded border border-input px-1.5 text-xs hover:bg-destructive/10 hover:text-destructive" @click="removeFile(i)">✕</button>
+          <button type="button" title="移除" aria-label="移除" class="shrink-0 rounded border border-input px-1.5 text-xs hover:bg-destructive/10 hover:text-destructive" @click="removeFile(i)">✕</button>
         </li>
       </ul>
     </div>
