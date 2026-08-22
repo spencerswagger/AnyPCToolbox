@@ -34,6 +34,11 @@ const router = createRouter({
       name: 'arch-os',
       component: () => import('@/views/ArchOs.vue'),
     },
+    {
+      path: '/rename',
+      name: 'rename',
+      component: () => import('@/views/Rename.vue'),
+    },
   ],
 })
 
