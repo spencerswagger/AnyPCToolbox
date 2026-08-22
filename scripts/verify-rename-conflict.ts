@@ -23,5 +23,12 @@ check('非冲突项不变', u[1] === 'b.jpg' && u[3] === 'c.jpg')
 const back = uniquify(['x', 'x', 'x'])
 check('多重复依次递增', back[0] === 'x' && back[1] === 'x (2)' && back[2] === 'x (3)')
 
+console.log('uniquify 边界')
+check('与既有占位名碰撞', JSON.stringify(uniquify(['a.jpg', 'a (2).jpg', 'a.jpg'])) === JSON.stringify(['a.jpg', 'a (2).jpg', 'a (3).jpg']))
+check('隐藏文件', JSON.stringify(uniquify(['.gitignore', '.gitignore'])) === JSON.stringify(['.gitignore', '.gitignore (2)']))
+check('多扩展名', JSON.stringify(uniquify(['a.tar.gz', 'a.tar.gz'])) === JSON.stringify(['a.tar.gz', 'a.tar (2).gz']))
+check('空串', JSON.stringify(uniquify(['', ''])) === JSON.stringify(['', ' (2)']))
+check('空数组', JSON.stringify(uniquify([])) === JSON.stringify([]))
+
 console.log(failed === 0 ? '\n全部通过' : `\n${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)
