@@ -55,12 +55,12 @@ export function batchPreview(
   opts: PreviewOptions = {},
 ): PreviewRow[] {
   const active = rules.filter(isRuleActive)
-  const ext = extRuleOf(rules) as { type: 'extension'; mode: 'keep' | 'replace'; ext: string } | undefined
+  const ext = extRuleOf(active) as { type: 'extension'; mode: 'keep' | 'replace'; ext: string } | undefined
+  const nonExt = active.filter((r) => r.type !== 'extension')
 
   const rawNew = files.map((f, index) => {
     const [stem, oldExt] = splitName(f.name)
     const ctx: BuildContext = { index, mtime: f.mtime }
-    const nonExt = active.filter((r) => r.type !== 'extension')
     const newStem = buildName(stem, nonExt, ctx)
     let newExt = oldExt
     if (ext && ext.mode === 'replace') {
@@ -90,15 +90,16 @@ export function batchPreview(
   })
 
   if (opts.autoNumber) {
-    // 对全部新名统一 uniquify（含未变更项，保证整体唯一），再回填
-    const uniq = uniquify(rawNew)
-    rows.forEach((r, i) => {
-      r.new = uniq[i]
-      r.changed = uniq[i] !== r.old
-      r.invalid = invalidReason(r.new)
+    // 用哨兵将 invalid 行隔离，使其不参与唯一化与冲突重算
+    const guarded = rows.map((r, i) => (r.invalid ? `\u0000invalid#${i}` : r.new))
+    const uniq = uniquify(guarded)
+    uniq.forEach((name, i) => {
+      if (rows[i].invalid) return
+      rows[i].new = name
+      rows[i].changed = name !== rows[i].old
+      rows[i].invalid = invalidReason(name)
     })
-    // 重新计算冲突（此时应无冲突，除非原名本就重复）
-    const names2 = rows.map((r) => r.new)
+    const names2 = rows.map((r, i) => (r.invalid ? `\u0000invalid#${i}` : r.new))
     const conf2 = flagConflicts(names2)
     rows.forEach((r, i) => { r.conflict = conf2[i] })
   }

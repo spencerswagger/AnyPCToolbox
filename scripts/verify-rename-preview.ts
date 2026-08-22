@@ -35,5 +35,30 @@ const clashFiles: FileEntry2[] = [
 const clash = batchPreview(clashFiles, [{ type: 'replace', find: 'b', with: 'a', onlyFirst: false, regex: false }])
 check('冲突标记', clash[1].conflict === true)
 
+console.log('扩展名：空 replace 不删扩展名(未激活)')
+const keepExt = batchPreview([{ name: 'a.jpg', mtime: 0, handle: null }], [{ type: 'extension', mode: 'replace', ext: '' }])
+check('空 replace 保留原扩展名', keepExt[0].new === 'a.jpg' && keepExt[0].changed === false)
+
+console.log('autoNumber')
+const an = batchPreview(clashFiles, [{ type: 'replace', find: 'b', with: 'a', onlyFirst: false, regex: false }], { autoNumber: true })
+check('自动补序号消解', an.map((r) => r.new).join(',') === 'a.jpg,a (2).jpg')
+check('补序后无冲突', an.every((r) => r.conflict === false))
+
+console.log('invalid 隔离')
+const invFiles: FileEntry2[] = [
+  { name: 'b1.jpg', mtime: 0, handle: null },
+  { name: 'b2.jpg', mtime: 0, handle: null },
+]
+const inv = batchPreview(invFiles, [{ type: 'replace', find: 'b', with: 'x<', onlyFirst: false, regex: false }])
+check('invalid 名被标非法', inv[0].invalid === '含非法字符')
+check('invalid 行不标冲突', inv[0].conflict === false && inv[1].conflict === false)
+
+console.log('splitName')
+const s2 = batchPreview([{ name: 'a.tar.gz', mtime: 0, handle: null }], [{ type: 'extension', mode: 'replace', ext: 'py' }])
+check('多扩展名替换最后一段', s2[0].new === 'a.tar.py')
+
+console.log('空文件列表')
+check('空数组', batchPreview([], []).length === 0)
+
 console.log(failed === 0 ? '\n全部通过' : `\n${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)
