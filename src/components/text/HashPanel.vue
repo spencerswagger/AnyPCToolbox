@@ -1,19 +1,29 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
-import { computeHash, type HashId } from '@/lib/text/hashes'
+import { ref, watch } from 'vue'
+import { sha256, computeHash, type HashId } from '@/lib/text/hashes'
 
 const props = defineProps<{ input: string; algo: string }>()
 
 const LABELS: Record<string, string> = {
   md5: 'MD5',
   crc32: 'CRC32',
-  sha1: 'SHA-1',
-  sha256: 'SHA-256',
-  sha512: 'SHA-512',
+  sha: 'SHA',
 }
 
-const value = ref('')
-const error = ref('')
+// SHA 变体：合并显示在同一个「SHA」tab 下
+const SHA_ROWS: { algo: string; label: string }[] = [
+  { algo: 'SHA-1', label: 'SHA-1' },
+  { algo: 'SHA-256', label: 'SHA-256' },
+  { algo: 'SHA-512', label: 'SHA-512' },
+]
+
+interface Row {
+  label: string
+  value: string
+  error: string
+}
+
+const rows = ref<Row[]>([])
 const computing = ref(false)
 const upper = ref(false)
 
@@ -21,15 +31,26 @@ watch(
   () => [props.input, props.algo] as const,
   async () => {
     if (!props.input) {
-      value.value = ''
-      error.value = ''
+      rows.value = []
       return
     }
     computing.value = true
     try {
-      const r = await computeHash(props.algo as HashId, props.input)
-      value.value = r.value
-      error.value = r.error ?? ''
+      if (props.algo === 'sha') {
+        const [a, b, c] = await Promise.all([
+          sha256(props.input, 'SHA-1'),
+          sha256(props.input, 'SHA-256'),
+          sha256(props.input, 'SHA-512'),
+        ])
+        rows.value = [
+          { label: SHA_ROWS[0].label, value: a, error: '' },
+          { label: SHA_ROWS[1].label, value: b, error: '' },
+          { label: SHA_ROWS[2].label, value: c, error: '' },
+        ]
+      } else {
+        const r = await computeHash(props.algo as HashId, props.input)
+        rows.value = [{ label: LABELS[props.algo] ?? r.label, value: r.value, error: r.error ?? '' }]
+      }
     } finally {
       computing.value = false
     }
@@ -37,7 +58,9 @@ watch(
   { immediate: true },
 )
 
-const display = computed(() => (upper.value ? value.value.toUpperCase() : value.value))
+function disp(value: string): string {
+  return upper.value ? value.toUpperCase() : value
+}
 
 async function copy(text: string): Promise<void> {
   try {
@@ -61,17 +84,19 @@ async function copy(text: string): Promise<void> {
         />
         <span class="text-muted-foreground">Hex 大写</span>
       </label>
-      <div class="flex items-center gap-2 rounded-md border px-3 py-2">
-        <span class="w-20 shrink-0 text-sm font-medium text-muted-foreground">{{ LABELS[algo] }}</span>
-        <code v-if="error" class="flex-1 break-all font-mono text-xs text-destructive">{{ error }}</code>
-        <code v-else class="min-w-0 flex-1 break-all font-mono text-xs">{{ display }}</code>
-        <button
-          v-if="!error"
-          class="shrink-0 rounded border border-input bg-background px-1.5 py-0.5 text-xs outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-          @click="copy(display)"
-        >
-          复制
-        </button>
+      <div class="space-y-1">
+        <div v-for="row in rows" :key="row.label" class="flex items-center gap-2 rounded-md border px-3 py-2">
+          <span class="w-20 shrink-0 text-sm font-medium text-muted-foreground">{{ row.label }}</span>
+          <code v-if="row.error" class="flex-1 break-all font-mono text-xs text-destructive">{{ row.error }}</code>
+          <code v-else class="min-w-0 flex-1 break-all font-mono text-xs">{{ disp(row.value) }}</code>
+          <button
+            v-if="!row.error"
+            class="shrink-0 rounded border border-input bg-background px-1.5 py-0.5 text-xs outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+            @click="copy(disp(row.value))"
+          >
+            复制
+          </button>
+        </div>
       </div>
     </template>
   </div>

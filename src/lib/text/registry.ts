@@ -59,13 +59,11 @@ const cryptoTools: ToolItem[] = Object.keys(CRYPTO_LABELS).map((algo) => ({
   props: { algo },
 }))
 
-// 哈希：SHA 系列排在一起，每种一个 tab（MD5 / CRC32 / SHA-1/256/512）
+// 哈希：SHA-1/256/512 合并到同一个「SHA」tab，MD5 / CRC32 各一个 tab
 const HASH_LABELS: Record<string, string> = {
   md5: 'MD5',
   crc32: 'CRC32',
-  sha1: 'SHA-1',
-  sha256: 'SHA-256',
-  sha512: 'SHA-512',
+  sha: 'SHA',
 }
 const hashTools: ToolItem[] = Object.keys(HASH_LABELS).map((algo) => ({
   id: algo,
