@@ -8,7 +8,7 @@ export interface TextStats {
   codePoints: number
   /** UTF-8 编码字节数 */
   bytesUtf8: number
-  /** UTF-16 编码字节数（2 / 4 按 surrogate pair 计） */
+  /** UTF-16 编码字节数（code units × 2） */
   bytesUtf16: number
   /** 行数（按 \r?\n 拆分后长度） */
   lines: number
@@ -36,7 +36,7 @@ export function computeStats(input: string): TextStats {
     chars: input.length,
     codePoints: codePoints.length,
     bytesUtf8: utf8Encoder.encode(input).length,
-    bytesUtf16: input.length + codePoints.filter((c) => c.length === 2).length * 2,
+    bytesUtf16: input.length * 2,
     lines: lines.length,
     nonEmptyLines: lines.filter((l) => l.trim() !== '').length,
     words,
