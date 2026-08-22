@@ -65,8 +65,10 @@ const STEPS: StepFn[] = [
 ]
 
 /**
- * 智能解码：从 input 反复尝试常见算法，累积换取可读性提升的链。
+ * 智能解码：从 input 反复尝试常见算法，累积换取可读性不降级的链。
  * maxRounds 限制迭代轮次，limit 限制返回链上限，避免指数爆炸。
+ * 用 seen 集合防环（避免 A→B→A），用「可读性不降级」作为推进门槛，
+ * 允许分数相等但确实成功的解码（如 Base64 aGk=→hi）。
  */
 export function smartDecode(input: string, maxRounds = 8, limit = 12): SmartDecodeResult {
   const note = '智能解码为启发式结果，结果仅供参考'
@@ -74,6 +76,7 @@ export function smartDecode(input: string, maxRounds = 8, limit = 12): SmartDeco
   let truncated = false
 
   const initialScore = scoreText(input)
+  const seen = new Set<string>([input])
   // BFS：队列元素为 { s, steps }
   let frontier: { s: string; steps: DecodeStep[] }[] = [{ s: input, steps: [] }]
 
@@ -82,12 +85,15 @@ export function smartDecode(input: string, maxRounds = 8, limit = 12): SmartDeco
     for (const node of frontier) {
       if (node.steps.length > 0) chains.push({ steps: node.steps, final: node.s, score: node.steps[node.steps.length - 1].score })
       if (chains.length >= limit) { truncated = true; break }
+      const nodeScore = scoreText(node.s)
       for (const step of STEPS) {
         const r = step(node.s)
         if (!r) continue
+        if (seen.has(r.out)) continue
         const sc = scoreText(r.out)
-        // 只有可读性提升才继续，防止死循环
-        if (sc > initialScore && node.s !== r.out) {
+        // 可读性不降级才继续，且防环；允许相等分数（成功的解码也推进）
+        if (sc >= nodeScore) {
+          seen.add(r.out)
           next.push({ s: r.out, steps: [...node.steps, { algorithm: r.algo, output: r.out, score: sc }] })
         }
       }
@@ -102,11 +108,11 @@ export function smartDecode(input: string, maxRounds = 8, limit = 12): SmartDeco
     chains.push({ steps: [], final: input, score: initialScore })
   }
   // 按分数倒序，去重 final
-  const seen = new Set<string>()
+  const finalSeen = new Set<string>()
   const out = chains
     .slice()
     .sort((a, b) => b.score - a.score)
-    .filter((c) => { if (seen.has(c.final)) return false; seen.add(c.final); return true })
+    .filter((c) => { if (finalSeen.has(c.final)) return false; finalSeen.add(c.final); return true })
     .slice(0, limit)
   return { chains: out, truncated, note }
 }
