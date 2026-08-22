@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { detectType } from '@/lib/text/detect'
 import { computeStats } from '@/lib/text/stats'
@@ -7,9 +7,8 @@ import { CATEGORIES, TOOL_ITEMS } from '@/lib/text/registry'
 
 const router = useRouter()
 const input = ref('')
-const textareaRef = ref<HTMLTextAreaElement | null>(null)
-const activeCategory = ref('encode')
-const activeItem = ref('encode')
+const activeCategory = ref<typeof CATEGORIES[number]['id']>('smart')
+const activeItem = ref('smart')
 const status = ref('')
 
 // 该大类下的子项
@@ -26,25 +25,6 @@ function selectCategory(cat: typeof CATEGORIES[number]['id']): void {
 }
 function selectItem(id: string): void {
   activeItem.value = id
-}
-
-function onInput(e: Event): void {
-  const el = e.target as HTMLTextAreaElement
-  void nextTick(() => autoResize(el))
-}
-
-const MIN_HEIGHT = 240
-function autoResize(el: HTMLTextAreaElement | null): void {
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = `${Math.max(el.scrollHeight, MIN_HEIGHT)}px`
-}
-
-function handleKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault()
-    void nextTick(() => autoResize(textareaRef.value))
-  }
 }
 
 async function copyInput(): Promise<void> {
@@ -135,37 +115,34 @@ function flashStatus(msg: string): void {
       </div>
     </div>
 
-    <!-- 主体：左输入 + 右结果 -->
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr,1.6fr]">
+    <!-- 主体：左输入 + 右结果（占满视口高度，内部各自滚动） -->
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr,1.6fr] md:h-[calc(100dvh-8.5rem)]">
       <!-- 左：输入区 -->
-      <div class="flex flex-col rounded-lg border">
+      <div class="flex min-h-0 flex-col rounded-lg border">
         <div class="flex items-center justify-between border-b px-3 py-2">
           <span class="text-xs font-medium uppercase tracking-wider text-muted-foreground">✏️ 输入文本</span>
           <span class="rounded bg-accent px-1.5 py-0.5 text-xs">{{ inputType }}</span>
         </div>
         <textarea
-          ref="textareaRef"
           v-model="input"
           rows="8"
-          placeholder="粘贴文本，右侧即时产出编解码 / 哈希 / 统计 / 时间戳 / 智能解码结果&#10;Ctrl+Enter 刷新布局"
+          placeholder="粘贴文本，右侧即时产出智能解码 / 编解码 / 哈希 / AES / 分析(统计与时间戳)结果"
           spellcheck="false"
           autocomplete="off"
           autocorrect="off"
           autocapitalize="off"
-          class="w-full flex-1 resize-none bg-transparent p-3 font-mono text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          @input="onInput"
-          @keydown="handleKeydown"
+          class="w-full flex-1 min-h-0 resize-none bg-transparent p-3 font-mono text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
 
       <!-- 右：大类 Tab + 结果 -->
-      <div class="flex flex-col rounded-lg border">
+      <div class="flex min-h-0 flex-col rounded-lg border">
         <div class="flex items-center border-b px-3 py-2">
           <span class="text-xs font-medium uppercase tracking-wider text-muted-foreground">🔬 处理结果</span>
         </div>
-        <div class="flex min-h-[360px]">
+        <div class="flex min-h-0 flex-1">
           <!-- 左侧大类 Tab -->
-          <div class="flex flex-col border-r">
+          <div class="flex flex-col overflow-auto border-r">
             <button
               v-for="cat in CATEGORIES"
               :key="cat.id"
@@ -192,7 +169,7 @@ function flashStatus(msg: string): void {
             <div v-if="!input.trim()" class="flex flex-1 items-center justify-center p-4 text-sm text-muted-foreground">
               输入文本后，此处实时显示 {{ currentItem.label }} 结果
             </div>
-            <div v-else class="flex-1 overflow-auto p-3">
+            <div v-else class="min-h-0 flex-1 overflow-auto p-3">
               <component :is="currentItem.component" :input="input" />
             </div>
           </div>

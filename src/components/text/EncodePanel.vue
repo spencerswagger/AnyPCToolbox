@@ -9,15 +9,34 @@ import {
 const props = defineProps<{ input: string }>()
 
 const rotShift = ref(13)
-const allSubs: { id: string; label: string; enc: (s: string) => Result; dec: (s: string) => Result }[] = [
-  { id: 'base64', label: 'Base64', enc: encodeBase64, dec: decodeBase64 },
-  { id: 'base64url', label: 'Base64URL', enc: encodeBase64Url, dec: decodeBase64Url },
-  { id: 'url', label: 'URL', enc: encodeUrl, dec: decodeUrl },
-  { id: 'unicode', label: 'Unicode', enc: encodeUnicode, dec: decodeUnicode },
-  { id: 'hex', label: 'Hex', enc: encodeHex, dec: decodeHex },
-  { id: 'html', label: 'HTML 实体', enc: encodeHtml, dec: decodeHtml },
-  { id: 'rot', label: 'ROT13', enc: (s) => rot(s, rotShift.value), dec: (s) => rot(s, rotShift.value) },
+
+interface SubItem {
+  id: string
+  label: string
+  enc: (s: string) => Result
+  dec: (s: string) => Result
+}
+/** 同类算法凑成小组，便于浏览 */
+const groups: { label: string; items: SubItem[] }[] = [
+  {
+    label: 'Base64 系列',
+    items: [
+      { id: 'base64', label: 'Base64', enc: encodeBase64, dec: decodeBase64 },
+      { id: 'base64url', label: 'Base64URL', enc: encodeBase64Url, dec: decodeBase64Url },
+    ],
+  },
+  {
+    label: '通用转义',
+    items: [
+      { id: 'url', label: 'URL', enc: encodeUrl, dec: decodeUrl },
+      { id: 'unicode', label: 'Unicode', enc: encodeUnicode, dec: decodeUnicode },
+      { id: 'hex', label: 'Hex', enc: encodeHex, dec: decodeHex },
+      { id: 'html', label: 'HTML 实体', enc: encodeHtml, dec: decodeHtml },
+      { id: 'rot', label: 'ROT13', enc: (s) => rot(s, rotShift.value), dec: (s) => rot(s, rotShift.value) },
+    ],
+  },
 ]
+const allSubs: SubItem[] = groups.flatMap((g) => g.items)
 
 const active = ref('base64')
 const activeSub = computed(() => allSubs.find((s) => s.id === active.value) ?? allSubs[0]!)
@@ -59,16 +78,21 @@ function download(text: string, name: string): void {
 
 <template>
   <div class="space-y-3">
-    <div class="flex flex-wrap gap-1">
-      <button
-        v-for="s in allSubs"
-        :key="s.id"
-        class="rounded-md px-2.5 py-1 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        :class="active === s.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'"
-        @click="active = s.id"
-      >
-        {{ s.label }}
-      </button>
+    <div class="space-y-2">
+      <div v-for="g in groups" :key="g.label">
+        <div class="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">{{ g.label }}</div>
+        <div class="flex flex-wrap gap-1">
+          <button
+            v-for="s in g.items"
+            :key="s.id"
+            class="rounded-md px-2.5 py-1 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :class="active === s.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'"
+            @click="active = s.id"
+          >
+            {{ s.label }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div v-if="active === 'rot'" class="flex items-center gap-2 text-sm">
