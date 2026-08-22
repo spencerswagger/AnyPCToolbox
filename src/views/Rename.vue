@@ -54,6 +54,25 @@ function handleFileInput(e: Event) {
   applied.value = false
 }
 
+/** 通过 <input webkitdirectory> 选文件夹（无需 FS Access，仅取当前层文件），只读预览 */
+function handleFolderInput(e: Event) {
+  const el = e.target as HTMLInputElement
+  if (!el.files) return
+  const root = Array.from(el.files).filter((f) => !((f as File).webkitRelativePath || '').includes('/'))
+  dirHandle.value = null
+  files.value = root.map((f) => ({
+    name: f.name,
+    size: f.size,
+    type: f.type,
+    mtime: f.lastModified || Date.now(),
+    handle: null,
+  }))
+  include.value = files.value.map(() => true)
+  undoAvailable.value = false
+  applied.value = false
+  toast(undefined, `已载入 ${files.value.length} 个文件（当前层）`)
+}
+
 // 拖拽：FS Access 支持时取目录/文件句柄；否则回退 DataTransfer.files
 function onDrop(e: DragEvent) {
   e.preventDefault()
@@ -203,9 +222,14 @@ async function undo() {
       <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">📂 文件区</div>
       <div class="flex flex-col items-center gap-1 border-b border-dashed px-4 py-6 text-sm text-muted-foreground" @dragover.prevent @drop="onDrop">
         <span>拖拽文件夹/文件到此处</span>
-        <label class="mt-1 cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">或选择文件
-          <input type="file" multiple class="sr-only" @change="handleFileInput">
-        </label>
+        <div class="mt-1 flex items-center gap-2">
+          <label class="cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">选择文件夹
+            <input type="file" webkitdirectory class="sr-only" @change="handleFolderInput">
+          </label>
+          <label class="cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">或选择文件
+            <input type="file" multiple class="sr-only" @change="handleFileInput">
+          </label>
+        </div>
       </div>
       <ul v-if="files.length" class="max-h-56 overflow-auto divide-y divide-border">
         <li v-for="(f, i) in files" :key="i" class="flex items-center gap-2 px-3 py-1.5 text-sm">
