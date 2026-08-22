@@ -30,6 +30,13 @@ const tools = [
     route: '/arch-os',
     tag: 'v1.0',
   },
+  {
+    icon: '📁',
+    name: '文件批量重命名',
+    description: '可视化规则块 + 实时预览，批量重命名文件并在桌面端真正写盘',
+    route: '/rename',
+    tag: 'v1.0',
+  },
 ]
 </script>
 
