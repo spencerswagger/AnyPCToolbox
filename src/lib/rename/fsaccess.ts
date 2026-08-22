@@ -12,15 +12,23 @@ export interface DirFileEntry {
   size: number
   type: string
   mtime: number
-  handle: FileSystemFileHandle
+  /** 只读模式（<input> 收集）下为 null */
+  handle: FileSystemFileHandle | null
+}
+
+/** 选夹结果：目录句柄 + 当前层文件 */
+export interface DirPickResult {
+  dir: FileSystemDirectoryHandle
+  files: DirFileEntry[]
 }
 
 /** 弹出原生"选文件夹"对话框并收集目录下所有文件（非递归，仅当前层） */
-export async function pickDirectory(): Promise<DirFileEntry[] | null> {
+export async function pickDirectory(): Promise<DirPickResult | null> {
   if (!detectFsAccess()) return null
   try {
     const dir: FileSystemDirectoryHandle = await window.showDirectoryPicker()
-    return await collectDirFiles(dir)
+    const files = await collectDirFiles(dir)
+    return { dir, files }
   } catch {
     return null // 用户取消或出错
   }
@@ -51,14 +59,14 @@ export function filesToEntries(files: FileList): DirFileEntry[] {
     name: f.name,
     size: f.size,
     type: f.type,
-    mtime: typeof f.lastModified === 'number' ? f.lastModified : Date.now(),
-    handle: null as unknown as FileSystemFileHandle,
+    mtime: f.lastModified,
+    handle: null,
   }))
 }
 
 /**
  * 对目录应用改名：新柄建 -> 写旧文件字节 -> 删旧柄。
- * 返回失败的旧名列表；成功则记录到撤销栈。
+ * 返回失败的旧名列表（已落盘的改名也计入成功的 applied/撤销记录）；成功则记录到撤销栈。
  */
 export async function commitRenames(
   dir: FileSystemDirectoryHandle,
@@ -66,25 +74,40 @@ export async function commitRenames(
 ): Promise<{ ok: boolean; failed: string[] }> {
   const failed: string[] = []
   const applied: { oldName: string; newName: string }[] = []
+  // 本次将腾出的旧路径集合：允许写入这些目标（支持链式/互换改名）
+  const vacated = new Set(ops.map((o) => o.oldName))
   for (const op of ops) {
     if (op.oldName === op.newName) continue
+    let w: FileSystemWritableFileStream | null = null
     try {
+      // 防御：目标已存在且非本批即将腾出路径时跳过，避免覆盖无关文件
+      const exists = await dir.getFileHandle(op.newName).then(() => true, () => false)
+      if (exists && !vacated.has(op.newName)) {
+        failed.push(op.oldName)
+        continue
+      }
       const oldHandle = await dir.getFileHandle(op.oldName)
       const file = await oldHandle.getFile()
       const newHandle: FileSystemFileHandle = await dir.getFileHandle(op.newName, { create: true })
-      const w = await newHandle.createWritable()
+      w = await newHandle.createWritable()
       await w.write(file)
       await w.close()
+      w = null
       await dir.removeEntry(op.oldName)
       applied.push(op)
     } catch {
-      // 尝试回滚本次已建的新柄
+      // 回滚：先中止未关闭的 writable（丢弃缓冲不落盘），再尝试删除已建新柄
+      try { await w?.abort() } catch { /* 忽略 */ }
       try { await dir.removeEntry(op.newName) } catch { /* 忽略 */ }
       failed.push(op.oldName)
     }
   }
   if (applied.length) {
-    await pushHistory({ time: Date.now(), dir, ops: applied })
+    try {
+      await pushHistory({ time: Date.now(), dir, ops: applied })
+    } catch {
+      // 已落盘但撤销记录写入失败：不因历史失败把整次判为失败
+    }
   }
   return { ok: failed.length === 0, failed }
 }
@@ -96,15 +119,18 @@ export async function revertBatch(
 ): Promise<string[]> {
   const failed: string[] = []
   for (const op of ops) {
+    let w: FileSystemWritableFileStream | null = null
     try {
       const newHandle = await dir.getFileHandle(op.newName)
       const file = await newHandle.getFile()
       const oldHandle: FileSystemFileHandle = await dir.getFileHandle(op.oldName, { create: true })
-      const w = await oldHandle.createWritable()
+      w = await oldHandle.createWritable()
       await w.write(file)
       await w.close()
+      w = null
       await dir.removeEntry(op.newName)
     } catch {
+      try { await w?.abort() } catch { /* 忽略 */ }
       failed.push(op.newName)
     }
   }
