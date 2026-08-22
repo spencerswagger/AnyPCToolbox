@@ -39,6 +39,11 @@ const router = createRouter({
       name: 'rename',
       component: () => import('@/views/Rename.vue'),
     },
+    {
+      path: '/units',
+      name: 'units',
+      component: () => import('@/views/Units.vue'),
+    },
   ],
 })
 

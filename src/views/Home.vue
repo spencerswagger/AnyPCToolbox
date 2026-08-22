@@ -44,6 +44,13 @@ const tools = [
     route: '/rename',
     tag: 'v1.0',
   },
+  {
+    icon: '🧮',
+    name: '单位换算',
+    description: "输入 30kg、$1.99、5'9\" 等片段，自动识别并列出全部等价单位",
+    route: '/units',
+    tag: 'v1.0',
+  },
 ]
 </script>
 
