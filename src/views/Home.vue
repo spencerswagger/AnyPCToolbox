@@ -30,6 +30,13 @@ const tools = [
     route: '/arch-os',
     tag: 'v1.0',
   },
+  {
+    icon: '🔤',
+    name: '文本处理中台',
+    description: '一次输入全部产出：编解码、哈希、统计、时间戳识别、智能解码',
+    route: '/text-hub',
+    tag: 'v1.1',
+  },
 ]
 </script>
 
