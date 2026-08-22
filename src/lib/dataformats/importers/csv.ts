@@ -1,3 +1,5 @@
+import type { DataNode } from '../node.ts'
+import { recordsToNode } from '../node.ts'
 import { buildRecords, type Cell } from '../records.ts'
 
 function parseCsv(text: string): string[][] {
@@ -27,9 +29,10 @@ function parseCsv(text: string): string[][] {
   return rows
 }
 
-export function csvToRecords(text: string) {
+export function csvToNode(text: string): DataNode {
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1) // 去除导出时写入的 BOM
   const rows = parseCsv(text)
-  if (rows.length === 0) return { columns: [], rows: [] }
+  if (rows.length === 0) return { type: 'array', value: [] }
   const body = rows.slice(1).map((r) => r as Cell[])
-  return buildRecords(rows[0], body)
+  return recordsToNode(buildRecords(rows[0], body))
 }

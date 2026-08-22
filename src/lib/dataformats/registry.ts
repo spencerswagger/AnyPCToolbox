@@ -1,20 +1,22 @@
-import type { FlattenStrategy, Records } from './records.ts'
+import type { FlattenStrategy } from './records.ts'
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml'
 import { parse as tomlParse, stringify as tomlStringify } from 'smol-toml'
 import { FormatError } from './records.ts'
-import { jsonToRecords } from './importers/json.ts'
-import { recordsToJson } from './exporters/json.ts'
-import { csvToRecords } from './importers/csv.ts'
-import { recordsToCsv } from './exporters/csv.ts'
-import { yamlToRecords } from './importers/yaml.ts'
-import { recordsToYaml } from './exporters/yaml.ts'
-import { tomlToRecords } from './importers/toml.ts'
-import { recordsToToml } from './exporters/toml.ts'
-import { xmlToRecords } from './importers/xml.ts'
-import { recordsToXml } from './exporters/xml.ts'
+import type { DataNode } from './node.ts'
+import { jsonToNode } from './importers/json.ts'
+import { nodeToJson } from './exporters/json.ts'
+import { csvToNode } from './importers/csv.ts'
+import { nodeToCsv } from './exporters/csv.ts'
+import { yamlToNode } from './importers/yaml.ts'
+import { nodeToYaml } from './exporters/yaml.ts'
+import { tomlToNode } from './importers/toml.ts'
+import { nodeToToml } from './exporters/toml.ts'
+import { xmlToNode } from './importers/xml.ts'
+import { nodeToXml } from './exporters/xml.ts'
 
-export type Importer = (text: string, strategy?: FlattenStrategy) => Records
-export type Exporter = (records: Records) => string
+// 平坦标记：目标为该格式时，导出需把树平坦投影为二维表（有损，仅平坦端）
+export type Importer = (text: string) => DataNode
+export type Exporter = (node: DataNode, projection?: import('./records.ts').Records) => string
 // 格式化当前源文本（美化重排），不改变数据结构；返回 null 表示此格式无需格式化
 export type Formatter = (text: string) => string
 
@@ -24,6 +26,7 @@ export interface FormatDescriptor {
   importer: Importer
   exporter: Exporter
   format: Formatter | null
+  flat: boolean
   ext: string
   // 每种策略各一份示例，突出该策略的展开效果
   samples: Record<FlattenStrategy, string>
@@ -37,14 +40,14 @@ const JSON_SAMPLE_SHALLOW =
 export const FORMATS: FormatDescriptor[] = [
   {
     id: 'json', label: 'JSON',
-    importer: jsonToRecords, exporter: recordsToJson,
+    importer: jsonToNode, exporter: nodeToJson, flat: false,
     format: (t) => { try { return JSON.stringify(JSON.parse(t), null, 2) } catch (e) { throw new FormatError(`JSON 格式化失败：${(e as Error).message}`) } },
     ext: 'json',
     samples: { flatten: JSON_SAMPLE_DEEP, firstLevel: JSON_SAMPLE_SHALLOW },
   },
   {
     id: 'yaml', label: 'YAML',
-    importer: yamlToRecords, exporter: recordsToYaml,
+    importer: yamlToNode, exporter: nodeToYaml, flat: false,
     format: (t) => { try { return yamlStringify(yamlParse(t)) } catch (e) { throw new FormatError(`YAML 格式化失败：${(e as Error).message}`) } },
     ext: 'yaml',
     samples: {
@@ -54,7 +57,7 @@ export const FORMATS: FormatDescriptor[] = [
   },
   {
     id: 'csv', label: 'CSV',
-    importer: csvToRecords, exporter: recordsToCsv,
+    importer: csvToNode, exporter: nodeToCsv, flat: true,
     // CSV 无缩进结构，仅去首尾空白/空行
     format: (t) => t.replace(/^\s+|\s+$/g, '').replace(/^\r?\n/, '').replace(/\r?\n$/m, ''),
     ext: 'csv',
@@ -65,7 +68,7 @@ export const FORMATS: FormatDescriptor[] = [
   },
   {
     id: 'toml', label: 'TOML',
-    importer: tomlToRecords, exporter: recordsToToml,
+    importer: tomlToNode, exporter: nodeToToml, flat: false,
     format: (t) => { try { return tomlStringify(tomlParse(t)) } catch (e) { throw new FormatError(`TOML 格式化失败：${(e as Error).message}`) } },
     ext: 'toml',
     samples: {
@@ -75,7 +78,7 @@ export const FORMATS: FormatDescriptor[] = [
   },
   {
     id: 'xml', label: 'XML',
-    importer: xmlToRecords, exporter: recordsToXml,
+    importer: xmlToNode, exporter: nodeToXml, flat: false,
     format: formatXml,
     ext: 'xml',
     samples: {

@@ -3,19 +3,23 @@ import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import hljs from 'highlight.js'
 import { FORMATS, getFormat } from '@/lib/dataformats/registry'
-import type { FlattenStrategy, Records, Cell } from '@/lib/dataformats/records'
+import type { Records, Cell } from '@/lib/dataformats/records'
+import type { DataNode } from '@/lib/dataformats/node'
+import { flattenNode } from '@/lib/dataformats/node'
+import TreeView from '@/components/dataformats/TreeView.vue'
+import 'highlight.js/styles/github.css'
 
 const router = useRouter()
 
 // 策略 toggle 元数据（flatten / firstLevel 各自附带悬停说明）
-const STRATEGIES: { id: FlattenStrategy; label: string; desc: string }[] = [
-  { id: 'flatten', label: 'flatten', desc: '点路径展开：嵌套对象递归展开为 a.b.c 列名，保留全部信息；深层改为单列 JSON 串。' },
-  { id: 'firstLevel', label: 'firstLevel', desc: '仅顶层：嵌套对象整体压缩为一列 JSON 串，列数可控，快速概览。' },
+const STRATEGIES: { id: 'flatten' | 'firstLevel'; label: string; desc: string }[] = [
+  { id: 'flatten', label: 'flatten', desc: '点路径展开：嵌套对象递归展开为 a.b.c 列名，保留全部信息；仅对平坦目标(CSV)导出生效。' },
+  { id: 'firstLevel', label: 'firstLevel', desc: '仅顶层：嵌套对象整体压缩为一列 JSON 串，列数可控；仅对平坦目标(CSV)导出生效。' },
 ]
 
 const sourceFormatId = ref('json')
 const targetFormatId = ref('yaml')
-const strategy = ref<FlattenStrategy>('flatten')
+const strategy = ref<'flatten' | 'firstLevel'>('flatten')
 const sourceText = ref('')
 const hidden = ref<Set<string>>(new Set())
 const order = ref<string[]>([])
@@ -25,10 +29,14 @@ const PAGE_SIZE = 50
 const sourceFormat = computed(() => getFormat(sourceFormatId.value)!)
 const targetFormat = computed(() => getFormat(targetFormatId.value)!)
 
-const records = computed<Records | null>(() => {
-  if (!sourceText.value.trim()) return { columns: [], rows: [] }
+// 目标是否为平坦格式：是则中间预览走表格投影 + 列编辑，导出有损平坦化
+const targetFlat = computed(() => targetFormat.value.flat)
+
+// —— 无损树：复杂格式导入即保存为 DataNode ——
+const sourceNode = computed<DataNode | null>(() => {
+  if (!sourceText.value.trim()) return { type: 'array', value: [] }
   try {
-    return sourceFormat.value.importer(sourceText.value, strategy.value)
+    return sourceFormat.value.importer(sourceText.value)
   } catch {
     return null
   }
@@ -37,16 +45,14 @@ const records = computed<Records | null>(() => {
 const error = computed<string | null>(() => {
   if (!sourceText.value.trim()) return null
   try {
-    sourceFormat.value.importer(sourceText.value, strategy.value)
+    sourceFormat.value.importer(sourceText.value)
     return null
   } catch (e) {
     return (e as Error).message
   }
 })
 
-// 格式化源文本失败时单独呈现（与解析错误区分的提示）
 const formatMsg = ref<string | null>(null)
-
 function formatSource() {
   if (!sourceText.value.trim()) return
   const f = sourceFormat.value.format
@@ -58,11 +64,28 @@ function formatSource() {
     formatMsg.value = (e as Error).message
   }
 }
-
 watch(sourceText, () => {
   formatMsg.value = null
   nextTick(() => autoResize(textareaRef.value))
 })
+
+// —— 平坦投影：仅在目标为平坦格式时用到 ——
+const projection = computed<Records | null>(() =>
+  sourceNode.value ? flattenNode(sourceNode.value, strategy.value) : null,
+)
+
+function nodeHasData(n: DataNode): boolean {
+  if (!n) return false
+  if (n.type === 'scalar') return n.value !== ''
+  if (n.type === 'array') return n.value.length > 0
+  return Object.keys(n.value).length > 0
+}
+
+const hasData = computed(
+  () => !!(sourceText.value.trim() && sourceNode.value && nodeHasData(sourceNode.value)),
+)
+
+const previewMode = computed<'table' | 'tree'>(() => (targetFlat.value ? 'table' : 'tree'))
 
 const stats = computed(() => {
   if (!sourceText.value.trim()) return { lines: 0, chars: 0, bytes: 0 }
@@ -73,8 +96,9 @@ const stats = computed(() => {
   }
 })
 
+// —— 表格预览（平坦目标专用）：列序/隐藏基于投影 Records ——
 function currentBase(): string[] {
-  const all = records.value?.columns ?? []
+  const all = projection.value?.columns ?? []
   if (order.value.length) return order.value.filter((c) => all.includes(c))
   return all
 }
@@ -84,12 +108,12 @@ const effectiveColumns = computed(() =>
 )
 
 const visibleRows = computed(() => {
-  if (!records.value) return []
-  const cols = records.value.columns
+  const proj = projection.value
+  if (!proj) return []
   const idx = effectiveColumns.value
-    .map((c) => cols.indexOf(c))
+    .map((c) => proj.columns.indexOf(c))
     .filter((i) => i >= 0)
-  return records.value.rows.map((r) => idx.map((i) => r[i]))
+  return proj.rows.map((r) => idx.map((i) => r[i]))
 })
 
 const pageRows = computed(() => {
@@ -101,17 +125,24 @@ const totalPages = computed(() =>
   Math.max(1, Math.ceil(visibleRows.value.length / PAGE_SIZE)),
 )
 
-const targetText = computed(() => {
-  const rec = records.value
-  if (!rec || rec.columns.length === 0) return ''
+// 应用到列编辑后的平坦投影：平坦目标 CSV 导出用
+const slimProjection = computed<Records | null>(() => {
+  const proj = projection.value
+  if (!proj) return null
   const eff = effectiveColumns.value
-  const idx = eff.map((c) => rec.columns.indexOf(c)).filter((i) => i >= 0)
-  const slim: Records = {
+  const idx = eff.map((c) => proj.columns.indexOf(c)).filter((i) => i >= 0)
+  return {
     columns: eff,
-    rows: rec.rows.map((r) => idx.map((i) => r[i])),
+    rows: proj.rows.map((r) => idx.map((i) => r[i])),
   }
+})
+
+const targetText = computed(() => {
+  const n = sourceNode.value
+  if (!n || !sourceText.value.trim()) return ''
+  const proj = targetFlat.value ? slimProjection.value ?? undefined : undefined
   try {
-    return targetFormat.value.exporter(slim)
+    return targetFormat.value.exporter(n, proj)
   } catch {
     return ''
   }
@@ -135,7 +166,7 @@ function moveCol(c: string, dir: number) {
 }
 
 function formatCell(cell: Cell): string {
-  if (cell === null) return ''
+  if (cell === null || cell === undefined) return ''
   if (cell === true) return 'true'
   if (cell === false) return 'false'
   return String(cell)
@@ -236,7 +267,6 @@ interface SavedState {
   sourceFormatId?: string
   targetFormatId?: string
 }
-
 onMounted(() => {
   try {
     const raw = localStorage.getItem('datafmt:last')
@@ -252,7 +282,6 @@ onMounted(() => {
     // ignore
   }
 })
-
 watch(
   [sourceText, sourceFormatId, targetFormatId],
   () => {
@@ -366,6 +395,7 @@ watch(
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <!-- 源数据 -->
       <div class="flex flex-col rounded-lg border">
         <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           ✏️ 源数据（{{ sourceFormat.label }}）
@@ -389,14 +419,20 @@ watch(
         </div>
       </div>
 
+      <!-- 预览：平坦目标(CSV) → 表格投影；复杂目标 → 树视图 -->
       <div class="flex flex-col rounded-lg border">
-        <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          👁️ 预览表格
+        <div class="flex items-center justify-between border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <span>👁️ 预览（{{ previewMode === 'table' ? '表格投影' : '树' }}）</span>
+          <span v-if="previewMode === 'tree'" class="normal-case tracking-normal">目标 {{ targetFormat.label }} 无损导出，预览仅示意</span>
         </div>
         <div class="min-h-[300px] flex-1 overflow-auto">
-          <div v-if="records === null" class="flex min-h-[300px] items-center justify-center p-4 text-sm text-muted-foreground">
+          <div v-if="error" class="flex min-h-[300px] items-center justify-center p-4 text-sm text-muted-foreground">
             解析失败，请检查输入
           </div>
+          <div v-else-if="!sourceText.trim() || !hasData" class="flex min-h-[300px] items-center justify-center p-4 text-sm text-muted-foreground">
+            输入数据以预览...
+          </div>
+          <TreeView v-else-if="previewMode === 'tree' && sourceNode" :node="sourceNode" class="p-2" />
           <div v-else-if="currentBase().length === 0" class="flex min-h-[300px] items-center justify-center p-4 text-sm text-muted-foreground">
             输入数据以预览表格...
           </div>
@@ -444,8 +480,12 @@ watch(
           </table>
         </div>
         <div class="flex items-center justify-between border-t px-3 py-1.5 text-xs text-muted-foreground">
-          <span>行数: {{ visibleRows.length }} | 列数: {{ effectiveColumns.length }}</span>
-          <div v-if="visibleRows.length" class="flex items-center gap-1">
+          <span v-if="previewMode === 'table' && projection">
+            {{ visibleRows.length }} 行 × {{ effectiveColumns.length }} 列
+          </span>
+          <span v-else-if="previewMode === 'tree' && sourceNode">树视图 · 可点击节点展开/收起</span>
+          <span v-else></span>
+          <div v-if="previewMode === 'table' && visibleRows.length" class="flex items-center gap-1">
             <button
               class="rounded border border-input px-1.5 py-0.5 hover:bg-accent disabled:opacity-40"
               :disabled="page === 0"
@@ -461,6 +501,7 @@ watch(
         </div>
       </div>
 
+      <!-- 目标结果 -->
       <div class="flex flex-col rounded-lg border">
         <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           🎯 目标结果（{{ targetFormat.label }}）
@@ -470,9 +511,9 @@ watch(
     </div>
 
     <div class="flex items-center justify-between border-t px-4 py-2 text-xs text-muted-foreground">
-      <span v-if="error === null && records && records.columns.length">✓ 校验通过 | 行数 {{ records.rows.length }} | 列数 {{ records.columns.length }}</span>
-      <span v-else-if="error">✗ 校验失败</span>
-      <span v-else>等待输入</span>
+      <span v-if="error">✗ 校验失败</span>
+      <span v-else-if="!sourceText.trim()">等待输入</span>
+      <span v-else>✓ {{ sourceFormat.label }} → {{ targetFormat.label }}</span>
       <span>行数 {{ stats.lines }} | 字符数 {{ stats.chars }} | 字节 {{ stats.bytes }}</span>
     </div>
   </div>

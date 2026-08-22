@@ -1,6 +1,7 @@
 import { stringify } from 'yaml'
-import { recordsToValue, type Records } from '../records.ts'
+import type { DataNode } from '../node.ts'
+import { nodeToValue } from '../node.ts'
 
-export function recordsToYaml(records: Records): string {
-  return stringify(recordsToValue(records))
+export function nodeToYaml(node: DataNode): string {
+  return stringify(nodeToValue(node))
 }

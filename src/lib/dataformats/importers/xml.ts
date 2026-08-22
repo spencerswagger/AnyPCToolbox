@@ -1,36 +1,45 @@
-import { FormatError, headerDedup, type Cell, type FlattenStrategy } from '../records.ts'
+import type { DataNode } from '../node.ts'
+import { dict, list, scalar } from '../node.ts'
+import { FormatError } from '../records.ts'
 
-function elementToRow(el: Element, prefix: string, strategy: FlattenStrategy, depth: number): Record<string, Cell> {
-  const out: Record<string, Cell> = {}
-  const path = (key: string) => (prefix ? `${prefix}.${key}` : key)
-  for (const attr of Array.from(el.attributes)) {
-    out[path(`@${attr.name}`)] = attr.value
-  }
-  const elemChildren = Array.from(el.children)
-  if (elemChildren.length === 0) {
-    out[prefix || 'data'] = (el.textContent ?? '') as Cell
-    return out
-  }
-  for (const child of elemChildren) {
-    const subPrefix = path(child.nodeName)
-    if (strategy === 'firstLevel' || depth >= 5) {
-      out[subPrefix] = (child.textContent ?? '') as Cell
-    } else {
-      Object.assign(out, elementToRow(child, subPrefix, strategy, depth + 1))
-    }
-  }
-  return out
+function trimmedText(el: Element): string {
+  return (el.textContent ?? '').trim()
 }
 
-export function xmlToRecords(text: string, strategy: FlattenStrategy = 'flatten') {
+// 一个元素 → DataNode：
+// - 无子元素/无属性 → 文本标量
+// - 有子元素 → dict（同名多次成为数组）
+// - 属性 → '@name' 键
+function elementToNode(el: Element): DataNode {
+  const attrs = Array.from(el.attributes)
+  const childEls = Array.from(el.children)
+  const obj: Record<string, DataNode> = {}
+  if (attrs.length === 0 && childEls.length === 0) {
+    return scalar(trimmedText(el))
+  }
+  for (const a of attrs) obj[`@${a.name}`] = scalar(a.value)
+  if (childEls.length > 0) {
+    const groups = new Map<string, Element[]>()
+    for (const c of childEls) {
+      const arr = groups.get(c.nodeName) ?? []
+      arr.push(c)
+      groups.set(c.nodeName, arr)
+    }
+    for (const [name, arr] of groups) {
+      obj[name] = arr.length === 1 ? elementToNode(arr[0]) : list(arr.map(elementToNode))
+    }
+  } else if (attrs.length > 0) {
+    const t = trimmedText(el)
+    if (t) obj['#text'] = scalar(t)
+  }
+  if (Object.keys(obj).length === 0) return scalar('')
+  return dict(obj)
+}
+
+export function xmlToNode(text: string): DataNode {
   const doc = new DOMParser().parseFromString(text, 'application/xml')
   if (doc.querySelector('parsererror')) throw new FormatError('XML 解析失败：无法解析 XML')
   const root = doc.documentElement
-  if (!root) return { columns: [], rows: [] }
-  const children = Array.from(root.children)
-  if (children.length === 0) return { columns: ['data'], rows: [[(root.textContent ?? '') as Cell]] }
-  const rowMaps = children.map((el) => elementToRow(el, '', strategy, 0))
-  const columns = headerDedup([...new Set(rowMaps.flatMap(Object.keys))])
-  const rows = rowMaps.map((m) => columns.map((c) => m[c] ?? null))
-  return { columns, rows }
+  if (!root) return { type: 'array', value: [] }
+  return dict({ [root.nodeName]: elementToNode(root) })
 }

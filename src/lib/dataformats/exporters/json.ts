@@ -1,5 +1,6 @@
-import { recordsToValue, type Records } from '../records.ts'
+import type { DataNode } from '../node.ts'
+import { nodeToValue } from '../node.ts'
 
-export function recordsToJson(records: Records): string {
-  return JSON.stringify(recordsToValue(records), null, 2)
+export function nodeToJson(node: DataNode): string {
+  return JSON.stringify(nodeToValue(node), null, 2)
 }
