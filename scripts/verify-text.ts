@@ -90,8 +90,9 @@ check('URL 链有结果', sd.chains.length > 0 && sd.chains.some((c) => c.final.
 const sdB64 = smartDecode('aGk=', 8, 12)
 check('Base64 链还原 hi', sdB64.chains.some((c) => c.final === 'hi'))
 check('默认轮次上限', sd.chains.length <= 12)
-// 等分解码防环：hello 经 ROT13 到 uryyb（可读性不降级被放行），不产生空态兜底链
-check('空态兜底（不可解码 @）', smartDecode('@', 8, 12).chains.some((c) => c.steps.length === 0 && c.final === '@'))
+// 严格意义提升门槛：ROT13 等恒变换不再被放行进候选；不可解码时无空态兜底链
+check('不可解码 @ 无空态兜底链', smartDecode('@', 8, 12).chains.length === 0)
+check('最大轮次 1 也有首层候选（<= 语义）', smartDecode('aGk=', 1, 12).chains.length > 0)
 
 console.log(failed === 0 ? '\n全部通过' : `\n${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)

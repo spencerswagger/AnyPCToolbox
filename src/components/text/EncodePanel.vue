@@ -43,8 +43,7 @@ function b64Encode(s: string, c: Record<string, ConfigValue>): Result {
   let v = r.value
   if (c.urlSafe === true) v = v.replace(/\+/g, '-').replace(/\//g, '_')
   if (c.pad === false) v = v.replace(/=+$/, '')
-  if (c.case === '大写') v = v.toUpperCase()
-  else if (c.case === '小写') v = v.toLowerCase()
+  if (c.upper === true) v = v.toUpperCase()
   return { ok: true, value: v }
 }
 function b64Decode(s: string, c: Record<string, ConfigValue>): Result {
@@ -96,7 +95,7 @@ const subs: SubItem[] = [
     configs: [
       { key: 'urlSafe', label: 'URL 安全', kind: 'bool', def: false },
       { key: 'pad', label: '补 = 填充', kind: 'bool', def: true },
-      { key: 'case', label: '大小写', kind: 'select', options: ['默认', '大写', '小写'], def: '默认' },
+      { key: 'upper', label: '大写', kind: 'bool', def: false },
     ],
     enc: b64Encode,
     dec: b64Decode,

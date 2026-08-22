@@ -44,8 +44,11 @@ async function copy(text: string): Promise<void> {
       𝒾 智能解码为启发式结果，结果仅供参考
     </div>
 
-    <p v-if="!input" class="text-sm text-muted-foreground">输入文本开始智能解码</p>
-    <div v-else-if="result && result.chains.length" class="space-y-2">
+    <p v-if="!input" class="text-sm text-muted-foreground">输入文本开始自动解码</p>
+    <div v-if="input && result && !result.chains.length" class="text-sm text-muted-foreground">
+      未检测到可解码的内容
+    </div>
+    <div v-else-if="input && result && result.chains.length" class="space-y-2">
       <div v-if="result.truncated" class="text-xs text-muted-foreground">已达结果上限，已截断</div>
       <div v-for="(c, i) in result.chains" :key="i" class="rounded-lg border">
         <div class="flex items-center border-b px-3 py-1.5 text-xs text-muted-foreground">
@@ -57,10 +60,7 @@ async function copy(text: string): Promise<void> {
             <code class="min-w-0 flex-1 break-all font-mono text-xs">{{ step.output }}</code>
             <span class="shrink-0 text-xs text-muted-foreground">{{ step.score }}</span>
           </div>
-          <template v-if="!c.steps.length">
-            <p class="text-sm text-muted-foreground">未检测到可用解码路径</p>
-          </template>
-          <div v-if="c.steps.length" class="mt-2 flex items-center gap-2 border-t pt-2">
+          <div class="mt-2 flex items-center gap-2 border-t pt-2">
             <span class="shrink-0 text-xs text-muted-foreground">最终</span>
             <code class="min-w-0 flex-1 break-all font-mono text-sm">{{ c.final }}</code>
             <button class="shrink-0 rounded border border-input bg-background px-1.5 py-0.5 text-xs outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring" @click="copy(c.final)">复制</button>

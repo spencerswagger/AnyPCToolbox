@@ -20,14 +20,13 @@ export interface ToolItem {
 }
 
 export const CATEGORIES: { id: Category; label: string }[] = [
-  { id: 'smart', label: '智能解码' },
   { id: 'encode', label: '编解码' },
   { id: 'hash', label: '哈希摘要' },
   { id: 'aes', label: '加解密' },
   { id: 'analyze', label: '分析' },
 ]
 
-// 编解码：每种算法一个 tab（Base64 / URL / Unicode / Hex / HTML / ROT），去掉二级 tab 与灰标题
+// 编解码：自动(智能解码)放第一个，其余每种算法一个 tab
 const ENCODE_LABELS: Record<string, string> = {
   base64: 'Base64',
   url: 'URL',
@@ -36,11 +35,27 @@ const ENCODE_LABELS: Record<string, string> = {
   html: 'HTML 实体',
   rot: 'ROT',
 }
-const encodeTools: ToolItem[] = Object.keys(ENCODE_LABELS).map((algo) => ({
+const encodeTools: ToolItem[] = [
+  { id: 'auto', label: '自动', category: 'encode', component: SmartDecodePanel },
+  ...Object.keys(ENCODE_LABELS).map((algo) => ({
+    id: algo,
+    label: ENCODE_LABELS[algo],
+    category: 'encode' as const,
+    component: EncodePanel,
+    props: { algo },
+  })),
+]
+
+// 加解密：AES / RSA 两种算法（AES 的模式等作为其内部参数）
+const CRYPTO_LABELS: Record<string, string> = {
+  aes: 'AES',
+  rsa: 'RSA',
+}
+const cryptoTools: ToolItem[] = Object.keys(CRYPTO_LABELS).map((algo) => ({
   id: algo,
-  label: ENCODE_LABELS[algo],
-  category: 'encode',
-  component: EncodePanel,
+  label: CRYPTO_LABELS[algo],
+  category: 'aes',
+  component: AesPanel,
   props: { algo },
 }))
 
@@ -61,10 +76,9 @@ const hashTools: ToolItem[] = Object.keys(HASH_LABELS).map((algo) => ({
 }))
 
 export const TOOL_ITEMS: ToolItem[] = [
-  { id: 'smart', label: '智能解码', category: 'smart', component: SmartDecodePanel },
   ...encodeTools,
   ...hashTools,
-  { id: 'aes', label: 'AES', category: 'aes', component: AesPanel },
+  ...cryptoTools,
   { id: 'stats', label: '统计', category: 'analyze', component: StatsPanel },
   { id: 'timestamp', label: '时间戳', category: 'analyze', component: TimestampPanel },
 ]

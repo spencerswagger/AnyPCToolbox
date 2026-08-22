@@ -7,8 +7,8 @@ import { CATEGORIES, TOOL_ITEMS } from '@/lib/text/registry'
 
 const router = useRouter()
 const input = ref('')
-const activeCategory = ref<typeof CATEGORIES[number]['id']>('smart')
-const activeItem = ref('smart')
+const activeCategory = ref<typeof CATEGORIES[number]['id']>('encode')
+const activeItem = ref('auto')
 const status = ref('')
 
 // 该大类下的子项

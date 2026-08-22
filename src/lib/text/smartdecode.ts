@@ -20,17 +20,6 @@ export interface SmartDecodeResult {
   note: string
 }
 
-/** 可打印字符比例（0-1） */
-function printable(s: string): number {
-  if (!s) return 0
-  let p = 0
-  for (const c of s) {
-    const code = c.codePointAt(0)!
-    if (code === 0x09 || code === 0x0a || code === 0x0d || (code >= 0x20 && code <= 0x7e) || code >= 0x80) p++
-  }
-  return p / Array.from(s).length
-}
-
 function looksJson(s: string): boolean {
   const t = s.trim()
   if (!t) return false
@@ -45,11 +34,29 @@ function looksJson(s: string): boolean {
   return false
 }
 
-function scoreText(s: string): number {
-  let sc = printable(s) * 100
-  if (looksJson(s)) sc += 30
-  if (/^[0-9a-zA-Z._\- ]+$/.test(s) && s.includes(' ')) sc += 10
-  return Math.max(0, Math.round(sc))
+/**
+ * 有意义的自然文本程度（0-100，兼作置信度）：
+ * 越像正常可读文本（大量单词 + 元音 + 空格）得分越高，避免「纯可打印字符」导致置信度恒为 100。
+ */
+function meaningScore(s: string): number {
+  const t = s.trim()
+  if (!t) return 0
+  if (looksJson(t)) return 100
+  const chars = Array.from(t)
+  const letters = t.replace(/[^a-zA-Z]/g, '').length
+  const alphaFraction = letters / chars.length
+  const lower = t.toLowerCase()
+  const tokens = lower.split(/[^a-z0-9']+/).filter(Boolean)
+  if (!tokens.length) return Math.round(alphaFraction * 50)
+  const wordy = tokens.filter((w) => /^[a-z']+$/.test(w)).length / tokens.length
+  const avgLen = tokens.reduce((a, w) => a + w.length, 0) / tokens.length
+  const hasVowel = tokens.some((w) => w.length >= 2 && /[aeiouy]/.test(w))
+  let sc = alphaFraction * 50
+  if (wordy >= 0.6) sc += 30
+  if (hasVowel) sc += 15
+  if (t.includes(' ')) sc += 5
+  if (avgLen < 2) sc -= 20
+  return Math.max(0, Math.min(100, Math.round(sc)))
 }
 
 type StepFn = (s: string) => { algo: string; out: string } | null
@@ -65,48 +72,45 @@ const STEPS: StepFn[] = [
 ]
 
 /**
- * 智能解码：从 input 反复尝试常见算法，累积换取可读性不降级的链。
- * maxRounds 限制迭代轮次，limit 限制返回链上限，避免指数爆炸。
- * 用 seen 集合防环（避免 A→B→A），用「可读性不降级」作为推进门槛，
- * 允许分数相等但确实成功的解码（如 Base64 aGk=→hi）。
+ * 智能解码：从 input 反复尝试常见算法，累积换取「可读性严格提升」的链。
+ * - maxRounds 含整轮（`<=`），填 1 也能产出首层候选。
+ * - 用 meaningScore 作门槛，只有解码后比当前明显更「像人话」才收录，
+ *   避免 ROT13 等恒变换产生噪音候选，也让置信度随可读性变化而非恒 100。
+ * - 无候选时不造假候选，由面板展示空态。
  */
 export function smartDecode(input: string, maxRounds = 8, limit = 12): SmartDecodeResult {
   const note = '智能解码为启发式结果，结果仅供参考'
   const chains: DecodeChain[] = []
   let truncated = false
 
-  const initialScore = scoreText(input)
   const seen = new Set<string>([input])
   // BFS：队列元素为 { s, steps }
   let frontier: { s: string; steps: DecodeStep[] }[] = [{ s: input, steps: [] }]
 
-  for (let round = 0; round < maxRounds; round++) {
+  for (let round = 1; round <= maxRounds; round++) {
     const next: { s: string; steps: DecodeStep[] }[] = []
     for (const node of frontier) {
-      if (node.steps.length > 0) chains.push({ steps: node.steps, final: node.s, score: node.steps[node.steps.length - 1].score })
-      if (chains.length >= limit) { truncated = true; break }
-      const nodeScore = scoreText(node.s)
+      const nodeScore = meaningScore(node.s)
       for (const step of STEPS) {
         const r = step(node.s)
         if (!r) continue
         if (seen.has(r.out)) continue
-        const sc = scoreText(r.out)
-        // 可读性不降级才继续，且防环；允许相等分数（成功的解码也推进）
-        if (sc >= nodeScore) {
+        const sc = meaningScore(r.out)
+        // 意义不降级才继续，且防环；相等分数不推进（抵消 ROT 这类恒成立的噪音）
+        if (sc > nodeScore) {
           seen.add(r.out)
-          next.push({ s: r.out, steps: [...node.steps, { algorithm: r.algo, output: r.out, score: sc }] })
+          const steps = [...node.steps, { algorithm: r.algo, output: r.out, score: sc }]
+          chains.push({ steps, final: r.out, score: sc })
+          next.push({ s: r.out, steps })
         }
       }
       if (chains.length >= limit) { truncated = true; break }
     }
-    if (truncated || next.length === 0) break
+    if (truncated) break
+    if (next.length === 0) break
     frontier = next.slice(0, limit)
   }
 
-  // 无任何进步时，至少给一条候选提示保持空态友好
-  if (chains.length === 0) {
-    chains.push({ steps: [], final: input, score: initialScore })
-  }
   // 按分数倒序，去重 final
   const finalSeen = new Set<string>()
   const out = chains
