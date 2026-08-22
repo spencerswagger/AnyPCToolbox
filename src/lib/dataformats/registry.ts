@@ -25,8 +25,14 @@ export interface FormatDescriptor {
   exporter: Exporter
   format: Formatter | null
   ext: string
-  sample: string
+  // 每种策略各一份示例，突出该策略的展开效果
+  samples: Record<FlattenStrategy, string>
 }
+
+const JSON_SAMPLE_DEEP =
+  '[{"order":1,"user":{"name":"小明","profile":{"city":"上海","hobbies":["篮球","摄影"]}},"active":true}]'
+const JSON_SAMPLE_SHALLOW =
+  '{"name":"小明","address":{"city":"上海","zip":200000},"tags":["a","b","c"]}'
 
 export const FORMATS: FormatDescriptor[] = [
   {
@@ -34,14 +40,17 @@ export const FORMATS: FormatDescriptor[] = [
     importer: jsonToRecords, exporter: recordsToJson,
     format: (t) => { try { return JSON.stringify(JSON.parse(t), null, 2) } catch (e) { throw new FormatError(`JSON 格式化失败：${(e as Error).message}`) } },
     ext: 'json',
-    sample: '{ "name": "示例", "age": 18 }',
+    samples: { flatten: JSON_SAMPLE_DEEP, firstLevel: JSON_SAMPLE_SHALLOW },
   },
   {
     id: 'yaml', label: 'YAML',
     importer: yamlToRecords, exporter: recordsToYaml,
     format: (t) => { try { return yamlStringify(yamlParse(t)) } catch (e) { throw new FormatError(`YAML 格式化失败：${(e as Error).message}`) } },
     ext: 'yaml',
-    sample: 'name: 示例\nage: 18',
+    samples: {
+      flatten: '- order: 1\n  user:\n    name: 小明\n    profile:\n      city: 上海\n      hobbies:\n        - 篮球\n        - 摄影\n  active: true',
+      firstLevel: 'name: 小明\naddress:\n  city: 上海\n  zip: 200000\ntags:\n  - a\n  - b\n  - c',
+    },
   },
   {
     id: 'csv', label: 'CSV',
@@ -49,21 +58,30 @@ export const FORMATS: FormatDescriptor[] = [
     // CSV 无缩进结构，仅去首尾空白/空行
     format: (t) => t.replace(/^\s+|\s+$/g, '').replace(/^\r?\n/, '').replace(/\r?\n$/m, ''),
     ext: 'csv',
-    sample: 'name,age\n示例,18',
+    samples: {
+      flatten: 'cs_id,name,email,salary\n1,"张三,丰",zs@example.com,"5,000"\n2,李四,ls@example.com,8000\n3,王五,ww@example.com,"12,500"',
+      firstLevel: 'cs_id,name,email,salary\n1,"张三,丰",zs@example.com,"5,000"\n2,李四,ls@example.com,8000',
+    },
   },
   {
     id: 'toml', label: 'TOML',
     importer: tomlToRecords, exporter: recordsToToml,
     format: (t) => { try { return tomlStringify(tomlParse(t)) } catch (e) { throw new FormatError(`TOML 格式化失败：${(e as Error).message}`) } },
     ext: 'toml',
-    sample: 'name = "示例"\nage = 18',
+    samples: {
+      flatten: 'order = 1\nactive = true\n\n[user]\nname = "小明"\n\n[user.profile]\ncity = "上海"\nhobbies = ["篮球", "摄影"]',
+      firstLevel: 'name = "小明"\n\n[address]\ncity = "上海"\nzip = 200000',
+    },
   },
   {
     id: 'xml', label: 'XML',
     importer: xmlToRecords, exporter: recordsToXml,
     format: formatXml,
     ext: 'xml',
-    sample: '<root><item><name>示例</name><age>18</age></item></root>',
+    samples: {
+      flatten: '<users><user><order>1</order><name>小明</name><profile><city>上海</city><hobbies>篮球</hobbies><hobbies>摄影</hobbies></profile><active>true</active></user></users>',
+      firstLevel: '<root><name>小明</name><address><city>上海</city><zip>200000</zip></address></root>',
+    },
   },
 ]
 

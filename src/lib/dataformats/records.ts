@@ -4,7 +4,7 @@ export interface Records {
   rows: Cell[][]
 }
 
-export type FlattenStrategy = 'flatten' | 'firstLevel' | 'raw'
+export type FlattenStrategy = 'flatten' | 'firstLevel'
 export const FLATTEN_DEPTH = 5
 
 export class FormatError extends Error {
@@ -77,9 +77,6 @@ function objectToRow(obj: unknown, prefix: string, strategy: FlattenStrategy, de
 
 export function valueToRecords(value: unknown, strategy: FlattenStrategy = 'flatten'): Records {
   if (value === null || value === undefined) return { columns: [], rows: [] }
-  if (strategy === 'raw') {
-    return { columns: ['data'], rows: [[JSON.stringify(value)]] }
-  }
   if (Array.isArray(value)) {
     const rowMaps = value.map((el) => objectToRow(el, '', strategy, 0))
     const columns = headerDedup([...new Set(rowMaps.flatMap(Object.keys))])

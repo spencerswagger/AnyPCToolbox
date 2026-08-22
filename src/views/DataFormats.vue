@@ -4,9 +4,14 @@ import { useRouter } from 'vue-router'
 import hljs from 'highlight.js'
 import { FORMATS, getFormat } from '@/lib/dataformats/registry'
 import type { FlattenStrategy, Records, Cell } from '@/lib/dataformats/records'
-import 'highlight.js/styles/github.css'
 
 const router = useRouter()
+
+// 策略 toggle 元数据（flatten / firstLevel 各自附带悬停说明）
+const STRATEGIES: { id: FlattenStrategy; label: string; desc: string }[] = [
+  { id: 'flatten', label: 'flatten', desc: '点路径展开：嵌套对象递归展开为 a.b.c 列名，保留全部信息；深层改为单列 JSON 串。' },
+  { id: 'firstLevel', label: 'firstLevel', desc: '仅顶层：嵌套对象整体压缩为一列 JSON 串，列数可控，快速概览。' },
+]
 
 const sourceFormatId = ref('json')
 const targetFormatId = ref('yaml')
@@ -152,7 +157,7 @@ function handleReverse() {
 }
 
 function loadSample() {
-  sourceText.value = sourceFormat.value.sample
+  sourceText.value = sourceFormat.value.samples[strategy.value] ?? sourceFormat.value.samples.flatten
   resetColumns()
 }
 
@@ -321,14 +326,25 @@ watch(
         <option v-for="f in FORMATS" :key="f.id" :value="f.id">{{ f.label }}</option>
       </select>
       <span class="mx-1 text-muted-foreground">|</span>
-      <select
-        v-model="strategy"
-        class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-      >
-        <option value="flatten">flatten 点路径展开</option>
-        <option value="firstLevel">firstLevel 仅顶层</option>
-        <option value="raw">raw 整块JSON串</option>
-      </select>
+      <div class="flex items-center rounded-md border border-input p-0.5">
+        <div
+          v-for="s in STRATEGIES"
+          :key="s.id"
+          class="relative"
+        >
+          <button
+            type="button"
+            class="rounded px-2.5 py-1 text-sm transition-colors"
+            :class="strategy === s.id ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
+            @click="strategy = s.id"
+          >
+            {{ s.label }}
+          </button>
+          <span class="strategy-tip pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md">
+            {{ s.desc }}
+          </span>
+        </div>
+      </div>
       <button
         class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
         @click="formatSource"
@@ -463,6 +479,22 @@ watch(
 </template>
 
 <style scoped>
+.strategy-tip {
+  display: none;
+}
+.strategy-tip::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: hsl(var(--popover));
+}
+div:hover > .strategy-tip {
+  display: block;
+}
+
 .editor-wrapper {
   position: relative;
   width: 100%;
