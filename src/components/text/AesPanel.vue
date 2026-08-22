@@ -9,6 +9,16 @@ const enc = ref<AesResult | null>(null)
 const dec = ref<AesResult | null>(null)
 const working = ref(false)
 
+/** 生成 32 字节随机密钥（Base64）并填入 */
+function generateKey(): void {
+  const bytes = crypto.getRandomValues(new Uint8Array(32))
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  key.value = btoa(bin)
+  enc.value = null
+  dec.value = null
+}
+
 async function run(): Promise<void> {
   working.value = true
   if (props.input) enc.value = await aesEncrypt(props.input, key.value)
@@ -29,9 +39,15 @@ async function copy(text: string): Promise<void> {
   <div class="space-y-3">
     <div class="flex flex-wrap items-end gap-3 rounded-lg border p-3">
       <label class="flex flex-col gap-1 text-sm">
-        <span class="text-muted-foreground">密钥</span>
-        <input v-model="key" type="text" placeholder="输入口令" class="h-8 w-48 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        <span class="text-muted-foreground">密钥 / 口令</span>
+        <input v-model="key" type="text" placeholder="输入密钥或口令，或点「生成密钥」" class="h-8 w-64 rounded-md border border-input bg-background px-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
       </label>
+      <button
+        class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring outline-none"
+        @click="generateKey"
+      >
+        生成密钥
+      </button>
       <button
         :disabled="working"
         class="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring outline-none"
