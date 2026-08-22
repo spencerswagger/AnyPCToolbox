@@ -77,10 +77,21 @@ function toSurrogate(cp: number): string {
   return `\\u${hi.toString(16).padStart(4, '0')}\\u${lo.toString(16).padStart(4, '0')}`
 }
 export function decodeUnicode(input: string): Result {
-  const decoded = input.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
-  // 对含引号/反斜杠等做转义后 JSON 解析，得到真正的字面值
   try {
-    return ok(JSON.parse(`"${decoded.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r/g, '\\r').replace(/\n/g, '\\n')}"`))
+    const decoded = input.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) =>
+      String.fromCharCode(Number.parseInt(hex, 16)),
+    )
+    const escaped = Array.from(decoded)
+      .map((c) => {
+        const code = c.charCodeAt(0)
+        // 控制字符一律转成 \uXXXX（JSON 字符串不容忍裸控制字符）
+        if (code < 0x20) return `\\u${code.toString(16).padStart(4, '0')}`
+        if (c === '"') return '\\"'
+        if (c === '\\') return '\\\\'
+        return c
+      })
+      .join('')
+    return ok(JSON.parse(`"${escaped}"`))
   } catch {
     return err('Unicode 解码失败：无效的转义序列')
   }

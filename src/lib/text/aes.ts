@@ -35,12 +35,12 @@ function hasCrypto(): boolean {
   return typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined'
 }
 
-/** 加密：text + 口令 → Base64(iv|密文)。iv 参数可填 Base64，默认随机 12 字节 */
-export async function aesEncrypt(text: string, password: string, ivB64 = ''): Promise<AesResult> {
+/** 加密：text + 口令 → Base64(iv|密文)。IV 随机生成（兼作 PBKDF2 盐与 GCM nonce），前缀存出 */
+export async function aesEncrypt(text: string, password: string): Promise<AesResult> {
   if (!hasCrypto()) return err('AES 不可用：当前环境无 WebCrypto')
   if (!password) return err('AES 加密失败：缺少密钥')
   try {
-    const iv = ivB64.trim() ? b64ToBytes(ivB64.trim()).slice(0, 12) : crypto.getRandomValues(new Uint8Array(12))
+    const iv = crypto.getRandomValues(new Uint8Array(12))
     const key = await deriveKey(password, iv)
     const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, utf8(text))
     const cipher = new Uint8Array(enc)
