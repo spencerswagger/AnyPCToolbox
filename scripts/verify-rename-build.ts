@@ -1,6 +1,7 @@
 // build.ts 逻辑自检脚本（约定同 scripts/verify-idcard.ts）
 // 运行：node scripts/verify-rename-build.ts
-import { buildName, formatStamp, type BuildContext } from '../src/lib/rename/build.ts'
+import { buildName, type BuildContext } from '../src/lib/rename/build.ts'
+import { formatStamp } from '../src/lib/rename/rules.ts'
 import type { Rule } from '../src/lib/rename/rules.ts'
 
 let failed = 0
@@ -31,7 +32,10 @@ check('按 index 递增', buildName('a', [{ type: 'sequence', start: 1, step: 1,
 
 console.log('时间戳')
 check('mtime 前位置', r([{ type: 'timestamp', format: 'YYYYMMDD', source: 'mtime', position: 'front', sep: '_' }]) === '20260822_IMG_001')
-check('now 后位置', r([{ type: 'timestamp', format: 'YYYY-MM-DD', source: 'now', position: 'back', sep: '_' }]).endsWith('_2026-08-22'))
+{
+  const exp = formatStamp(Date.now(), 'YYYY-MM-DD')
+  check('now 后位置', r([{ type: 'timestamp', format: 'YYYY-MM-DD', source: 'now', position: 'back', sep: '_' }]) === `IMG_001_${exp}`)
+}
 
 console.log('大小写')
 check('全大写', capName('upper') === 'IMG_001')

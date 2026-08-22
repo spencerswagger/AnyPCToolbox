@@ -1,7 +1,6 @@
 // build.ts：单个文件"根名" -> 新"根名"的纯函数（不含扩展名规则）
 // 规则按数组顺序依次作用。扩展名在 preview.ts 层处理，不进入本函数。
 import { formatStamp, type Rule, type ReplaceRule } from './rules.ts'
-export { formatStamp }
 
 export interface BuildContext {
   /** 该文件在其预览队列中的序号（0 起） */
