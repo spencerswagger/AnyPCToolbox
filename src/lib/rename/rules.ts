@@ -75,7 +75,7 @@ export function createRule(type: RuleType): Rule {
     case 'case':
       return { type, mode: 'upper' }
     case 'remove':
-      return { type, mode: 'range', start: 1, count: 1, chars: '' }
+      return { type, mode: 'range', start: 1, count: 0, chars: '' }
     case 'extension':
       return { type, mode: 'keep', ext: '' }
   }
