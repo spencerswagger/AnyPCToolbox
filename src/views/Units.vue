@@ -149,14 +149,15 @@ const TEMP_FORMULA: Record<string, Record<string, string>> = {
 function directRule(e: Entry, eq: Equivalent): string[] {
   if (eq.noRate) return ['无汇率数据']
   const t = e.token
-  // 合并项：逐片段给出 1 单位到悬停目标的直接换算比率，同单位跳过
+  // 合并项：逐片段给出 1 单位到悬停目标的直接换算比率；首个片段始终展示，其余片段同单位跳过
   if (t.merged && t.parts?.length) {
     const dim = e.result?.dim
     const rates = rateState.value?.rates ?? null
     const lines: string[] = []
     if (dim) {
-      for (const p of t.parts) {
-        if (p.unit === eq.unit) continue
+      for (let i = 0; i < t.parts.length; i++) {
+        const p = t.parts[i]
+        if (i > 0 && p.unit === eq.unit) continue
         const ratio = directRatio(p.unit, eq.unit, dim, rates)
         if (ratio === undefined) continue
         lines.push(`1 ${p.unit} = ${formatValue(ratio)} ${eq.unit}`)
