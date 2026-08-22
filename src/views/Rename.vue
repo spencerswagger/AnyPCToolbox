@@ -5,7 +5,6 @@ import { useToaster } from '@/lib/ui/use-toast'
 import RuleBlock from '@/components/rename/RuleBlock.vue'
 import { createRule, RULE_TYPES, type Rule, type RuleType } from '@/lib/rename/rules'
 import { batchPreview, type FileEntry2 } from '@/lib/rename/preview'
-import { diffSegments } from '@/lib/rename/diff'
 import { detectFsAccess, pickDirectory, commitRenames, revertBatch, filesToEntries } from '@/lib/rename/fsaccess'
 import { popHistory } from '@/lib/rename/history'
 
@@ -21,6 +20,7 @@ const autoNumber = ref(false)
 const undoAvailable = ref(false)
 const applied = ref(false)
 const addType = ref<RuleType>('replace')
+const folderRef = ref<HTMLInputElement | null>(null)
 
 const rows = computed(() => batchPreview(files.value, rules.value, { autoNumber: autoNumber.value }))
 
@@ -54,23 +54,29 @@ function handleFileInput(e: Event) {
   applied.value = false
 }
 
-/** 通过 <input webkitdirectory> 选文件夹（无需 FS Access，仅取当前层文件），只读预览 */
+/** 文件区"选择文件夹"：FS Access 可用时走 showDirectoryPicker（可写盘），否则回退 webkitdirectory 只读预览 */
+async function chooseFolder() {
+  if (isFsAccess) { await handlePick(); return }
+  folderRef.value?.click()
+}
+
+/** 通过 <input webkitdirectory> 选文件夹（无 FS Access 的只读预览） */
 function handleFolderInput(e: Event) {
   const el = e.target as HTMLInputElement
+  el.value = ''
   if (!el.files) return
-  const root = Array.from(el.files).filter((f) => !((f as File).webkitRelativePath || '').includes('/'))
-  dirHandle.value = null
-  files.value = root.map((f) => ({
-    name: f.name,
+  files.value = Array.from(el.files).map((f) => ({
+    name: (f as File).webkitRelativePath || f.name,
     size: f.size,
     type: f.type,
     mtime: f.lastModified || Date.now(),
     handle: null,
   }))
+  dirHandle.value = null
   include.value = files.value.map(() => true)
   undoAvailable.value = false
   applied.value = false
-  toast(undefined, `已载入 ${files.value.length} 个文件（当前层）`)
+  toast(undefined, `已载入 ${files.value.length} 个文件`)
 }
 
 // 拖拽：FS Access 支持时取目录/文件句柄；否则回退 DataTransfer.files
@@ -208,10 +214,6 @@ async function undo() {
       <button type="button" class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors" @click="router.push('/')">← 返回</button>
       <span class="text-muted-foreground">|</span>
       <h2 class="text-lg font-semibold">文件批量重命名</h2>
-      <div class="ml-auto flex items-center gap-2">
-        <button v-if="isFsAccess" type="button" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground" @click="handlePick">📁 选文件夹</button>
-        <button type="button" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40" :disabled="!undoAvailable" @click="undo">撤销</button>
-      </div>
     </div>
 
     <!-- 能力边界提示 -->
@@ -223,12 +225,11 @@ async function undo() {
       <div class="flex flex-col items-center gap-1 border-b border-dashed px-4 py-6 text-sm text-muted-foreground" @dragover.prevent @drop="onDrop">
         <span>拖拽文件夹/文件到此处</span>
         <div class="mt-1 flex items-center gap-2">
-          <label class="cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">选择文件夹
-            <input type="file" webkitdirectory class="sr-only" @change="handleFolderInput">
-          </label>
-          <label class="cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">或选择文件
+          <button type="button" class="cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground" @click="chooseFolder">选择文件夹</button>
+          <label class="cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">选择文件
             <input type="file" multiple class="sr-only" @change="handleFileInput">
           </label>
+          <input ref="folderRef" type="file" webkitdirectory class="hidden" @change="handleFolderInput">
         </div>
       </div>
       <ul v-if="files.length" class="max-h-56 overflow-auto divide-y divide-border">
@@ -260,19 +261,22 @@ async function undo() {
     <!-- 预览区 -->
     <div class="flex flex-col rounded-lg border">
       <div class="flex items-center gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-        <span>👁️ 预览（勾选应用，增绿删红）</span>
+        <span>👁️ 预览（绿色=将改名，灰色=不变）</span>
         <label class="ml-auto flex items-center gap-1 text-xs text-muted-foreground normal-case"><input v-model="autoNumber" type="checkbox"> 冲突自动加序号</label>
       </div>
       <ul v-if="rows.length" class="max-h-72 overflow-auto divide-y divide-border">
         <li v-for="(r, i) in rows" :key="i" class="flex items-center gap-2 px-3 py-1.5 text-sm">
           <input v-model="include[i]" type="checkbox" class="shrink-0">
           <div class="min-w-0 flex-1 truncate font-mono text-xs">
-            <span class="text-muted-foreground line-through">{{ r.old }}</span>
-            <span class="mx-1 text-muted-foreground">→</span>
-            <template v-if="r.new === r.old"><span class="text-muted-foreground">{{ r.old }}</span></template>
-            <template v-else-if="r.invalid"><span class="text-destructive">{{ r.new }}</span></template>
+            <template v-if="r.invalid">
+              <span class="text-destructive">{{ r.new }}</span>
+            </template>
+            <template v-else-if="r.changed">
+              <span class="text-emerald-600 dark:text-emerald-400">{{ r.new }}</span>
+              <span class="ml-1 text-muted-foreground">← {{ r.old }}</span>
+            </template>
             <template v-else>
-              <span v-for="(sg, k) in diffSegments(r.old, r.new)" :key="k" :class="{ 'text-emerald-600 dark:text-emerald-400': sg.type === 'add', 'text-destructive': sg.type === 'del' }">{{ sg.text }}</span>
+              <span class="text-muted-foreground">{{ r.old }}</span>
             </template>
           </div>
           <span v-if="r.conflict" class="shrink-0 text-xs text-destructive">⛔ 重名</span>
@@ -290,6 +294,7 @@ async function undo() {
         <span v-if="applied" class="text-xs text-emerald-600 dark:text-emerald-400">已应用，可撤销或重新选择文件/调整规则</span>
         <button v-if="isFsAccess" type="button" class="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40" :disabled="applied || !dirHandle || !stats.willChange || stats.conflict > 0 || stats.invalid > 0" @click="applyChanges">应用更改</button>
         <button v-else type="button" class="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40" :disabled="!stats.willChange" @click="exportList">导出改名列表</button>
+        <button type="button" class="rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40" :disabled="!undoAvailable" @click="undo">撤销</button>
       </div>
     </div>
   </div>
