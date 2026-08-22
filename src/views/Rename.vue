@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToaster } from '@/lib/ui/use-toast'
 import RuleBlock from '@/components/rename/RuleBlock.vue'
@@ -36,6 +36,29 @@ const stats = computed(() => {
 })
 
 const hasWritable = computed(() => files.value.some((f) => !!f.root))
+
+/* ---------------- 排序：让「序号」规则获得可控顺序 ---------------- */
+const sortKey = ref<'name' | 'mtime' | 'size'>('name')
+const sortDir = ref<'asc' | 'desc'>('asc')
+
+function applySort() {
+  if (files.value.length < 2) return
+  const order = files.value.map((_, i) => i)
+  order.sort((a, b) => {
+    const fa = files.value[a]
+    const fb = files.value[b]
+    let r = 0
+    if (sortKey.value === 'name') r = fa.name.localeCompare(fb.name)
+    else if (sortKey.value === 'mtime') r = (fa.mtime ?? 0) - (fb.mtime ?? 0)
+    else if (sortKey.value === 'size') r = (fa.size ?? 0) - (fb.size ?? 0)
+    return r === 0 ? 0 : sortDir.value === 'asc' ? r : -r
+  })
+  files.value = order.map((i) => files.value[i])
+  include.value = order.map((i) => include.value[i])
+  undoAvailable.value = false
+  applied.value = false
+}
+watch([sortKey, sortDir], applySort)
 
 /* ---------------- 树状视图 ----------------
  * 根据相对路径把文件组织成目录树（目录可折叠），叶子关联文件下标。 */
@@ -362,7 +385,17 @@ async function undo() {
     <div class="flex flex-col rounded-lg border">
       <div class="flex items-center gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
         <span>👁️ 预览（绿色=将改名，灰色=不变，整行可点击勾选）</span>
-        <label class="ml-auto flex items-center gap-1 text-xs text-muted-foreground normal-case"><input v-model="autoNumber" type="checkbox"> 冲突自动加序号</label>
+        <div class="ml-auto flex items-center gap-3 text-xs normal-case">
+          <label class="flex items-center gap-1 text-muted-foreground">排序
+            <select v-model="sortKey" class="rounded-md border border-input bg-background px-1.5 py-1 text-xs">
+              <option value="name">名称</option>
+              <option value="mtime">修改时间</option>
+              <option value="size">大小</option>
+            </select>
+            <button type="button" class="rounded-md border border-input bg-background px-1.5 py-1 text-xs" @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'">{{ sortDir === 'asc' ? '↑' : '↓' }}</button>
+          </label>
+          <label class="flex items-center gap-1 text-muted-foreground normal-case"><input v-model="autoNumber" type="checkbox"> 冲突自动加序号</label>
+        </div>
       </div>
       <ul v-if="rows.length" class="max-h-72 overflow-auto divide-y divide-border">
         <li v-for="(r, i) in rows" :key="i" class="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent/40" :class="{ 'cursor-pointer': true }" @click="toggleFile(i)">

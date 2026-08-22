@@ -13,7 +13,7 @@ export interface AffixRule { type: 'prefix' | 'suffix'; text: string }
 export interface SequenceRule { type: 'sequence'; start: number; step: number; width: number; position: 'front' | 'back'; sep: string }
 export interface TimestampRule { type: 'timestamp'; format: string; source: 'now' | 'mtime'; position: 'front' | 'back'; sep: string }
 export interface CaseRule { type: 'case'; mode: 'upper' | 'lower' | 'cap' }
-export interface RemoveRule { type: 'remove'; mode: 'range' | 'chars'; start: number; count: number; chars: string }
+export interface RemoveRule { type: 'remove'; start: number; count: number }
 export interface ExtensionRule { type: 'extension'; mode: 'keep' | 'replace'; ext: string }
 
 export type Rule =
@@ -75,7 +75,7 @@ export function createRule(type: RuleType): Rule {
     case 'case':
       return { type, mode: 'upper' }
     case 'remove':
-      return { type, mode: 'range', start: 1, count: 0, chars: '' }
+      return { type, start: 1, count: 0 }
     case 'extension':
       return { type, mode: 'keep', ext: '' }
   }
@@ -94,7 +94,7 @@ export function isRuleActive(r: Rule): boolean {
     case 'case':
       return true
     case 'remove':
-      return r.mode === 'range' ? r.count > 0 : r.chars.length > 0
+      return r.count > 0
     case 'extension':
       return r.mode === 'replace' ? r.ext.length > 0 : false
   }

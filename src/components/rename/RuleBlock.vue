@@ -69,15 +69,10 @@ function setType(t: RuleType) {
       </select>
     </template>
 
-    <!-- 删除字符 -->
+    <!-- 删除字符：删固定位 -->
     <template v-if="rule.type === 'remove'">
-      <label class="flex items-center gap-0.5"><input v-model="rule.mode" type="radio" value="range"> 删固定位</label>
-      <label class="flex items-center gap-0.5"><input v-model="rule.mode" type="radio" value="chars"> 删字符</label>
-      <template v-if="rule.mode === 'range'">
-        <label class="flex items-center gap-1">第 <input v-model.number="rule.start" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"> 位起删</label>
-        <label class="flex items-center gap-1"><input v-model.number="rule.count" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"> 位</label>
-      </template>
-      <label v-else class="flex items-center gap-1">删 <input v-model="rule.chars" class="w-20 rounded-md border border-input bg-background px-1.5 py-1" placeholder="如 abc#"></label>
+      <label class="flex items-center gap-1">删第 <input v-model.number="rule.start" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"> 位起</label>
+      <label class="flex items-center gap-1"><input v-model.number="rule.count" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"> 位</label>
     </template>
 
     <!-- 扩展名 -->
