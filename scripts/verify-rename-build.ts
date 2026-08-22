@@ -43,8 +43,8 @@ check('全小写', capName('lower') === 'img_001')
 check('首字母大写（仅首字母）', capName('cap') === 'Img_001')
 
 console.log('删除字符')
-check('删前4位', r([{ type: 'remove', mode: 'range', start: 1, count: 4, chars: '' }]) === '001')
-check('删指定字符集', r([{ type: 'remove', mode: 'chars', start: 1, count: 1, chars: 'I' }]) === 'MG_001')
+check('删前4位', r([{ type: 'remove', start: 1, count: 4 }]) === '001')
+check('删第2删2位', r([{ type: 'remove', start: 2, count: 2 }]) === 'I_001')
 
 console.log('规则顺序生效')
 check('先替换再前缀', r([

@@ -5,12 +5,15 @@ import { isRuleActive, type Rule } from './rules.ts'
 
 /** 进入预览的最小文件描述（view 里由 FS 句柄或 <input> File 填充） */
 export interface FileEntry2 {
+  /** 要改名的完整名称（可为相对路径，如 sub/img.jpg） */
   name: string
   size?: number
   type?: string
   mtime?: number
   /** FS Access 模式下持有文件句柄以写盘；只读模式为 null */
   handle: FileSystemFileHandle | null
+  /** 该文件所属的根目录句柄（写盘用）；仅通过文件夹选取时有值 */
+  root?: FileSystemDirectoryHandle | null
 }
 
 export interface PreviewRow {
@@ -65,11 +68,6 @@ export function markSourceReuse(
   return mark
 }
 
-/** 取规则中的扩展名规则（应为 0 或 1 个） */
-function extRuleOf(rules: Rule[]): Rule | undefined {
-  return rules.length ? rules.find((r) => r.type === 'extension') : undefined
-}
-
 export interface PreviewOptions {
   /** 是否开启"自动加序号"消解冲突 */
   autoNumber?: boolean
@@ -81,19 +79,20 @@ export function batchPreview(
   opts: PreviewOptions = {},
 ): PreviewRow[] {
   const active = rules.filter(isRuleActive)
-  const ext = extRuleOf(active) as { type: 'extension'; mode: 'keep' | 'replace'; ext: string } | undefined
-  const nonExt = active.filter((r) => r.type !== 'extension')
+  // 扩展名规则单独取用（可对整个文件名做最后一段扩展名替换），其余规则作用于完整文件名（含扩展名）
+  const ext = active.find((r) => r.type === 'extension') as Extract<Rule, { type: 'extension' }> | undefined
+  const trans = active.filter((r) => r.type !== 'extension')
 
   const rawNew = files.map((f, index) => {
-    const [stem, oldExt] = splitName(f.name)
     const ctx: BuildContext = { index, mtime: f.mtime }
-    const newStem = buildName(stem, nonExt, ctx)
-    let newExt = oldExt
+    // 规则匹配完整文件名（含扩展名），如查找-替换可直接命中 .jpg
+    const full = buildName(f.name, trans, ctx)
     if (ext && ext.mode === 'replace') {
-      const e = ext.ext.trim()
-      newExt = e ? (e.startsWith('.') ? e : `.${e}`) : ''
+      const [base] = splitName(full)
+      const e = ext.ext.trim().replace(/^\./, '')
+      return e ? `${base}.${e}` : base
     }
-    return newStem + newExt
+    return full
   })
 
   const rows: PreviewRow[] = files.map((f, i) => {

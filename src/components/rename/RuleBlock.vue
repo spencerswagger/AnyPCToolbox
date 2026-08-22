@@ -1,15 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { createRule, RULE_TYPES, RULE_LABEL, TIMESTAMP_FORMATS, type Rule, type RuleType } from '@/lib/rename/rules'
+import { createRule, RULE_TYPES, TIMESTAMP_FORMATS, type Rule, type RuleType } from '@/lib/rename/rules'
 
-const props = defineProps<{ rule: Rule; canUp: boolean; canDown: boolean }>()
+defineProps<{ rule: Rule; canUp: boolean; canDown: boolean }>()
 const emit = defineEmits<{
   (e: 'update:rule', rule: Rule): void
   (e: 'remove'): void
   (e: 'move', dir: -1 | 1): void
 }>()
-
-const label = computed(() => RULE_LABEL[props.rule.type])
 
 function setType(t: RuleType) {
   emit('update:rule', createRule(t))
@@ -17,99 +14,79 @@ function setType(t: RuleType) {
 </script>
 
 <template>
-  <div class="space-y-3 rounded-lg border p-3">
-    <div class="flex items-center gap-2">
-      <span class="text-sm font-medium">{{ label }}</span>
-      <select class="rounded-md border border-input bg-background px-2 py-1 text-xs" :value="rule.type" @change="setType(RULE_TYPES.find(t => t.value === ($event.target as HTMLSelectElement).value)?.value ?? rule.type)">
-        <option v-for="t in RULE_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
-      </select>
-      <div class="ml-auto flex items-center gap-1">
-        <button type="button" aria-label="上移" class="rounded border border-input px-1.5 text-xs disabled:opacity-40" :disabled="!canUp" @click="emit('move', -1)">↑</button>
-        <button type="button" aria-label="下移" class="rounded border border-input px-1.5 text-xs disabled:opacity-40" :disabled="!canDown" @click="emit('move', 1)">↓</button>
-        <button type="button" aria-label="删除规则" class="rounded border border-input px-1.5 text-xs hover:bg-destructive/10 hover:text-destructive" @click="emit('remove')">✕</button>
-      </div>
-    </div>
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-2 py-1.5 text-xs">
+    <!-- 类型 -->
+    <select
+      class="rounded-md border border-input bg-background px-1.5 py-1 text-xs"
+      :value="rule.type"
+      @change="setType(RULE_TYPES.find(t => t.value === ($event.target as HTMLSelectElement).value)?.value ?? rule.type)"
+    >
+      <option v-for="t in RULE_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
+    </select>
 
-    <!-- 查找-替换 -->
-    <div v-if="rule.type === 'replace'" class="grid gap-2 text-xs">
-      <label class="flex items-center gap-2">
-        查找
-        <input v-model="rule.find" class="flex-1 rounded-md border border-input bg-background px-2 py-1" placeholder="IMG_">
-      </label>
-      <label class="flex items-center gap-2">
-        替换为
-        <input v-model="rule.with" class="flex-1 rounded-md border border-input bg-background px-2 py-1" placeholder="保留为空则删除">
-      </label>
-      <label class="flex items-center gap-2"><input v-model="rule.onlyFirst" type="checkbox"> 仅替换首个</label>
-      <details class="text-xs"><summary>高级：正则</summary>
-        <label class="flex items-center gap-2 mt-1"><input v-model="rule.regex" type="checkbox"> 当作正则表达式</label>
-      </details>
-    </div>
+    <!-- 查找替换 -->
+    <template v-if="rule.type === 'replace'">
+      <label class="flex items-center gap-1">查找 <input v-model="rule.find" class="w-20 rounded-md border border-input bg-background px-1.5 py-1" placeholder="IMG_"></label>
+      <span class="text-muted-foreground">→</span>
+      <label title="将匹配到的内容替换为指定文本；若留空则删除匹配到的内容" class="flex items-center gap-1">替换为 <input v-model="rule.with" class="w-20 rounded-md border border-input bg-background px-1.5 py-1"></label>
+      <label class="flex items-center gap-1" title="只替换第一处匹配"><input v-model="rule.onlyFirst" type="checkbox"> 仅首处</label>
+      <label class="flex items-center gap-1" title="将查找内容作为正则表达式匹配"><input v-model="rule.regex" type="checkbox"> 正则</label>
+    </template>
 
     <!-- 前缀/后缀 -->
-    <div v-if="rule.type === 'prefix' || rule.type === 'suffix'" class="flex items-center gap-2 text-xs">
-      {{ rule.type === 'prefix' ? '前缀文本' : '后缀文本' }}
-      <input v-model="rule.text" class="flex-1 rounded-md border border-input bg-background px-2 py-1" placeholder="例如 2025-">
-    </div>
+    <template v-if="rule.type === 'prefix' || rule.type === 'suffix'">
+      <label class="flex items-center gap-1" :title="rule.type === 'prefix' ? '在文件名开头插入的文本' : '在文件名末尾（扩展名前）插入的文本'">{{ rule.type === 'prefix' ? '前缀' : '后缀' }} <input v-model="rule.text" class="w-28 rounded-md border border-input bg-background px-1.5 py-1" placeholder="例如 2025-"></label>
+    </template>
 
     <!-- 序号 -->
-    <div v-if="rule.type === 'sequence'" class="grid grid-cols-2 gap-2 text-xs">
-      <label>起始 <input v-model.number="rule.start" type="number" class="w-full rounded-md border border-input bg-background px-2 py-1"></label>
-      <label>步长 <input v-model.number="rule.step" type="number" class="w-full rounded-md border border-input bg-background px-2 py-1"></label>
-      <label>位数 <input v-model.number="rule.width" type="number" min="1" class="w-full rounded-md border border-input bg-background px-2 py-1"></label>
-      <label>分隔符 <input v-model="rule.sep" class="w-full rounded-md border border-input bg-background px-2 py-1"></label>
-      <label class="col-span-2 flex items-center gap-2">位置
-        <label class="flex items-center gap-1"><input v-model="rule.position" type="radio" value="front"> 前</label>
-        <label class="flex items-center gap-1"><input v-model="rule.position" type="radio" value="back"> 后</label>
-      </label>
-    </div>
+    <template v-if="rule.type === 'sequence'">
+      <label class="flex items-center gap-1" title="序号起始值"><input v-model.number="rule.start" type="number" min="0" class="w-14 rounded-md border border-input bg-background px-1.5 py-1"> 起始</label>
+      <label class="flex items-center gap-1" title="序号每次的递增量"><input v-model.number="rule.step" type="number" class="w-14 rounded-md border border-input bg-background px-1.5 py-1"> 步长</label>
+      <label class="flex items-center gap-1" title="序号按几位显示，不足补零"><input v-model.number="rule.width" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"> 位数</label>
+      <label class="flex items-center gap-0.5" title="序号加在名称前"><input v-model="rule.position" type="radio" value="front"> 前</label>
+      <label class="flex items-center gap-0.5" title="序号加在名称后"><input v-model="rule.position" type="radio" value="back"> 后</label>
+      <label class="flex items-center gap-1" title="序号与名称之间的分隔文本"><input v-model="rule.sep" class="w-10 rounded-md border border-input bg-background px-1.5 py-1"> 分隔</label>
+    </template>
 
     <!-- 时间戳 -->
-    <div v-if="rule.type === 'timestamp'" class="grid gap-2 text-xs">
-      <label>格式
-        <select v-model="rule.format" class="w-full rounded-md border border-input bg-background px-2 py-1 text-xs">
-          <option v-for="f in TIMESTAMP_FORMATS" :key="f" :value="f">{{ f }}</option>
-        </select>
-      </label>
-      <label class="flex items-center gap-2">来源
-        <label class="flex items-center gap-1"><input v-model="rule.source" type="radio" value="mtime"> 文件修改时间</label>
-        <label class="flex items-center gap-1"><input v-model="rule.source" type="radio" value="now"> 当前时间</label>
-      </label>
-      <label class="flex items-center gap-2">位置
-        <label class="flex items-center gap-1"><input v-model="rule.position" type="radio" value="front"> 前</label>
-        <label class="flex items-center gap-1"><input v-model="rule.position" type="radio" value="back"> 后</label>
-      </label>
-      <label>分隔符 <input v-model="rule.sep" class="w-full rounded-md border border-input bg-background px-2 py-1"></label>
-    </div>
+    <template v-if="rule.type === 'timestamp'">
+      <select v-model="rule.format" class="rounded-md border border-input bg-background px-1.5 py-1 text-xs" title="时间戳的显示格式">
+        <option v-for="f in TIMESTAMP_FORMATS" :key="f" :value="f">{{ f }}</option>
+      </select>
+      <label class="flex items-center gap-0.5" title="使用文件的修改时间"><input v-model="rule.source" type="radio" value="mtime"> 文件时间</label>
+      <label class="flex items-center gap-0.5" title="使用当前时间"><input v-model="rule.source" type="radio" value="now"> 当前时间</label>
+      <label class="flex items-center gap-0.5" title="时间戳加在名称前"><input v-model="rule.position" type="radio" value="front"> 前</label>
+      <label class="flex items-center gap-0.5" title="时间戳加在名称后"><input v-model="rule.position" type="radio" value="back"> 后</label>
+      <label class="flex items-center gap-1" title="时间戳与名称之间的分隔文本"><input v-model="rule.sep" class="w-10 rounded-md border border-input bg-background px-1.5 py-1"> 分隔</label>
+    </template>
 
     <!-- 大小写 -->
-    <div v-if="rule.type === 'case'" class="flex items-center gap-2 text-xs">
-      <select v-model="rule.mode" class="rounded-md border border-input bg-background px-2 py-1 text-xs">
+    <template v-if="rule.type === 'case'">
+      <select v-model="rule.mode" class="rounded-md border border-input bg-background px-1.5 py-1 text-xs">
         <option value="upper">全大写</option>
         <option value="lower">全小写</option>
         <option value="cap">首字母大写</option>
       </select>
-    </div>
+    </template>
 
-    <!-- 删除字符 -->
-    <div v-if="rule.type === 'remove'" class="grid gap-2 text-xs">
-      <label class="flex items-center gap-2">方式
-        <label class="flex items-center gap-1"><input v-model="rule.mode" type="radio" value="range"> 删固定位</label>
-        <label class="flex items-center gap-1"><input v-model="rule.mode" type="radio" value="chars"> 删字符集</label>
-      </label>
-      <template v-if="rule.mode === 'range'">
-        <label>从第几位删(1起) <input v-model.number="rule.start" type="number" min="1" class="w-full rounded-md border border-input bg-background px-2 py-1"></label>
-        <label>删几位 <input v-model.number="rule.count" type="number" min="1" class="w-full rounded-md border border-input bg-background px-2 py-1"></label>
-      </template>
-      <label v-else>删除的字符(可多选) <input v-model="rule.chars" class="w-full rounded-md border border-input bg-background px-2 py-1" placeholder="例如 abc#"></label>
-      <details class="text-xs"><summary>说明</summary><span>删除字符集暂不支持正则，请直接输入字符。</span></details>
-    </div>
+    <!-- 删除字符：删固定位 -->
+    <template v-if="rule.type === 'remove'">
+      <label class="flex items-center gap-1" title="从第几位开始删除"><span>位置</span> <input v-model.number="rule.start" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"></label>
+      <label class="flex items-center gap-1" title="一次删除的字符数量"><span>数量</span> <input v-model.number="rule.count" type="number" min="1" class="w-12 rounded-md border border-input bg-background px-1.5 py-1"></label>
+    </template>
 
     <!-- 扩展名 -->
-    <div v-if="rule.type === 'extension'" class="flex items-center gap-2 text-xs">
-      <label class="flex items-center gap-1"><input v-model="rule.mode" type="radio" value="keep"> 保留</label>
-      <label class="flex items-center gap-1"><input v-model="rule.mode" type="radio" value="replace"> 替换为</label>
-      <input v-if="rule.mode === 'replace'" v-model="rule.ext" class="w-28 rounded-md border border-input bg-background px-2 py-1" placeholder="jpg">
+    <template v-if="rule.type === 'extension'">
+      <label class="flex items-center gap-0.5" title="保留原扩展名"><input v-model="rule.mode" type="radio" value="keep"> 保留</label>
+      <label class="flex items-center gap-0.5" title="统一替换为指定的扩展名"><input v-model="rule.mode" type="radio" value="replace"> 替换</label>
+      <input v-if="rule.mode === 'replace'" v-model="rule.ext" class="w-16 rounded-md border border-input bg-background px-1.5 py-1" placeholder="jpg">
+    </template>
+
+    <!-- 操作 -->
+    <div class="ml-auto flex items-center gap-1">
+      <button type="button" aria-label="上移" class="rounded border border-input px-1.5 text-xs disabled:opacity-40" :disabled="!canUp" @click="emit('move', -1)">↑</button>
+      <button type="button" aria-label="下移" class="rounded border border-input px-1.5 text-xs disabled:opacity-40" :disabled="!canDown" @click="emit('move', 1)">↓</button>
+      <button type="button" aria-label="删除规则" class="rounded border border-input px-1.5 text-xs hover:bg-destructive/10 hover:text-destructive" @click="emit('remove')">✕</button>
     </div>
   </div>
 </template>

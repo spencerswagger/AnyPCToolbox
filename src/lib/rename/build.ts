@@ -40,16 +40,13 @@ function applyRule(name: string, rule: Rule, ctx: BuildContext): string {
       if (rule.mode === 'upper') return name.toUpperCase()
       if (rule.mode === 'lower') return name.toLowerCase()
       return name.charAt(0).toUpperCase() + name.slice(1)
-    case 'remove':
-      if (rule.mode === 'chars') {
-        const set = new Set(rule.chars)
-        return [...name].filter((c) => !set.has(c)).join('')
-      }
-      // range：按 Unicode 字符计数，从 start(1 起) 删 count 个
+    case 'remove': {
+      // 按 Unicode 字符计数，从 start(1 起) 删 count 个
       const chars = [...name]
       const startIdx = rule.start - 1
       if (startIdx < 0 || startIdx >= chars.length) return name
       return chars.slice(0, startIdx).concat(chars.slice(startIdx + rule.count)).join('')
+    }
     default:
       return name
   }
