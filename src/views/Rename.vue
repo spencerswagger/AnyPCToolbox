@@ -110,6 +110,16 @@ function removeFile(idx: number) {
   files.value.splice(idx, 1)
   include.value.splice(idx, 1)
 }
+/** 删除某个文件夹及其下所有文件（按相对路径前缀匹配） */
+function removeDir(path: string) {
+  const prefix = path + '/'
+  const keep = files.value
+    .map((f, i) => ({ f, i }))
+    .filter(({ f }) => !(f.name === path || f.name.startsWith(prefix)))
+  files.value = keep.map((k) => k.f)
+  include.value = keep.map((k) => include.value[k.i])
+  openAllDirs()
+}
 
 /* ---------------- 文件载入（追加而非覆盖，去重） ---------------- */
 function addEntries(newEntries: FileEntry2[]) {
@@ -298,12 +308,11 @@ async function undo() {
     <!-- 能力边界提示 -->
     <div v-if="!isFsAccess" class="flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">⚠️ 当前环境无法直接修改磁盘文件，仅支持预览与导出改名列表（建议使用 Chrome/Edge 或桌面版）。</div>
 
-    <!-- 文件区（树状） -->
-    <div class="flex flex-col rounded-lg border">
-      <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">📂 文件区（{{ files.length }}）</div>
-      <div class="flex flex-col items-center gap-1 border-b border-dashed px-4 py-6 text-sm text-muted-foreground" @dragover.prevent @drop="onDrop">
-        <span>拖拽文件夹/文件到此处（追加）</span>
-        <div class="mt-1 flex items-center gap-2">
+    <!-- 文件区（树状，整体可拖放） -->
+    <div class="flex flex-col rounded-lg border" @dragover.prevent @drop="onDrop">
+      <div class="flex items-center gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <span>📂 文件区（{{ files.length }}）</span>
+        <div class="ml-auto flex items-center gap-2 text-xs normal-case">
           <button type="button" class="cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground" @click="chooseFolder">选择文件夹</button>
           <label class="cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">选择文件
             <input type="file" multiple class="sr-only" @change="handleFileInput">
@@ -314,10 +323,13 @@ async function undo() {
       <ul v-if="visibleTree.length" class="max-h-64 overflow-auto divide-y divide-border">
         <li v-for="n in visibleTree" :key="n.key" class="flex items-center gap-1 text-sm" :style="{ paddingLeft: n.depth * 14 + 8 + 'px' }">
           <template v-if="n.kind === 'dir'">
-            <button type="button" class="flex w-full items-center gap-1 py-1 text-left font-medium text-muted-foreground hover:text-foreground" @click="toggleDir(n.key)">
-              <span class="inline-block w-3 text-xs">{{ openKeys.has(n.key) ? '▾' : '▸' }}</span>
-              <span>📁 {{ n.label }}</span>
-            </button>
+            <div class="flex w-full items-center gap-1 py-1">
+              <button type="button" class="flex min-w-0 flex-1 items-center gap-1 text-left font-medium text-muted-foreground hover:text-foreground" @click="toggleDir(n.key)">
+                <span class="inline-block w-3 text-xs">{{ openKeys.has(n.key) ? '▾' : '▸' }}</span>
+                <span class="truncate">📁 {{ n.label }}</span>
+              </button>
+              <span title="删除该文件夹及其下所有文件" class="shrink-0 rounded border border-input px-1 text-xs hover:bg-destructive/10 hover:text-destructive" @click.stop="removeDir(n.path)">✕</span>
+            </div>
           </template>
           <template v-else>
             <button type="button" class="flex w-full items-center gap-1 py-1 text-left hover:bg-accent/40" @click="toggleFile(n.index!)">
@@ -329,7 +341,7 @@ async function undo() {
           </template>
         </li>
       </ul>
-      <div v-else class="px-3 py-6 text-center text-sm text-muted-foreground">尚未载入文件</div>
+      <div v-else class="px-3 py-6 text-center text-sm text-muted-foreground">尚未载入文件（可将文件夹/文件拖到此处）</div>
     </div>
 
     <!-- 规则区 -->
