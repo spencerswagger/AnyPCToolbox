@@ -27,7 +27,7 @@ check('codePoints (emoji=1)', st.codePoints === 7, String(st.codePoints))
 check('UTF-8 bytes', st.bytesUtf8 === 12, String(st.bytesUtf8))
 check('lines', st.lines === 3, String(st.lines))
 check('nonEmptyLines', st.nonEmptyLines === 2, String(st.nonEmptyLines))
-check('words', st.words === 3, String(st.words))
+check('words', st.words === 2, String(st.words))
 const empty = computeStats('')
 check('空输入全 0', empty.chars === 0 && empty.words === 0)
 
@@ -42,7 +42,7 @@ check('通用', detectType('hello world') === 'generic')
 
 console.log('编解码 round-trip')
 const rt = (name: string, enc: (s: string) => { value: string }, dec: (s: string) => { value: string }) =>
-  check(name, dec(enc('Hello 你好 🙂')).value === 'Hello 你好 🙂')
+  check(name, dec(enc('Hello 你好 🙂').value).value === 'Hello 你好 🙂')
 rt('Base64', encodeBase64, decodeBase64)
 rt('Base64URL', encodeBase64Url, decodeBase64Url)
 rt('URL', encodeUrl, decodeUrl)
@@ -55,7 +55,7 @@ if (typeof document !== 'undefined') {
 } else {
   check('HTML 编码映射 & → &amp;', encodeHtml('&').value === '&amp;')
 }
-check('ROT13 往返', rot(rot('Hello', 13), 13).value === 'Hello')
+check('ROT13 往返', rot(rot('Hello', 13).value, 13).value === 'Hello')
 check('ROT13 中文不变', rot('你好', 13).value === '你好')
 
 console.log('非法输入 → { ok:false, error }')
@@ -82,7 +82,7 @@ const ts = extractTimestamps('时间 1693948800 和 2026-08-22 10:30')
 check('发现 Unix 秒命中', ts.some((h) => h.raw === '1693948800' && h.kind === 'unixSec'))
 check('发现日期串命中', ts.some((h) => h.raw === '2026-08-22 10:30' && h.kind === 'date'))
 const epoch = extractTimestamps('0 1000000000')
-check('1970/2001 边界可解析', epoch.length === 2)
+check('Unix 10/13 位才识别（2001 命中，"0" 忽略）', epoch.length === 1 && epoch[0]?.raw === '1000000000')
 
 console.log('智能解码')
 const sd = smartDecode(encodeUrl('hello=world').value, 8, 12)

@@ -1,5 +1,5 @@
 // 智能解码：启发式侦探（BFS 受限迭代）。结果仅供参考，不保证还原。
-import { decodeBase64, decodeBase64Url, decodeUrl, decodeUnicode, decodeHex, decodeHtml, rot } from './encoders'
+import { decodeBase64, decodeBase64Url, decodeUrl, decodeUnicode, decodeHex, decodeHtml, rot } from './encoders.ts'
 
 export interface DecodeStep {
   algorithm: string
