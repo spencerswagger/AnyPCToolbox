@@ -118,6 +118,12 @@ check('3min20s → 1 段', mTime.length === 1, String(mTime.length))
 check('3min20s → 合计 200s', mTime[0].unit === 'min' && near((mTime[0].value ?? 0) * 60, 200), JSON.stringify(mTime[0]))
 check('3min20s → raw 合并为 3min20s', mTime[0].raw === '3min20s', mTime[0].raw)
 check('3min20s → parts 2 项且归一为 min', mTime[0].parts?.length === 2 && near(mTime[0].parts[1].value, 20 / 60) && mTime[0].parts[1].unit === 's', JSON.stringify(mTime[0].parts))
+{
+  const mTimeEq = equivalentsFor(mTime[0])!
+  const minRow = mTimeEq.equivalents.find((e) => e.unit === 'min')
+  check('3min20s → 结果含首单位 min 3.33333', Boolean(minRow) && near(minRow?.value ?? 0, 10 / 3), JSON.stringify(minRow))
+  check('3min20s → 结果含 200s', near(mTimeEq.equivalents.find((e) => e.unit === 's')?.value ?? 0, 200))
+}
 check('directRatio(min→s) = 60', near(directRatio('min', 's', 'time') ?? 0, 60), String(directRatio('min', 's', 'time')))
 check('directRatio(t→kg) = 1000', near(directRatio('t', 'kg', 'weight') ?? 0, 1000), String(directRatio('t', 'kg', 'weight')))
 check('directRatio 同单位 = 1', directRatio('s', 's', 'time') === 1)

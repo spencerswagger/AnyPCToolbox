@@ -100,7 +100,7 @@ export function directRatio(
 
 /** 片段 → 该量纲全部等价项；无单位/量纲/无法换算返回 null */
 export function equivalentsFor(
-  tok: { value?: number; unit?: string; dim?: Dim },
+  tok: { value?: number; unit?: string; dim?: Dim; merged?: boolean },
   rates?: Rates | null,
 ): EquivResult | null {
   if (tok.dim === undefined || tok.unit === undefined || tok.value === undefined) return null
@@ -142,7 +142,8 @@ export function equivalentsFor(
     sourceUnit: tok.unit,
     sourceName: u.name,
     equivalents: UNITS[tok.dim]
-      .filter((x) => x.canonical !== tok.unit)
+      // 合并项的总值以首单位表达，需保留首单位自身的换算行
+      .filter((x) => x.canonical !== tok.unit || tok.merged)
       .map((x) => ({
         unit: x.canonical,
         name: x.name,
