@@ -2,14 +2,14 @@
 import { computed } from 'vue'
 import { createRule, RULE_TYPES, RULE_LABEL, TIMESTAMP_FORMATS, type Rule, type RuleType } from '@/lib/rename/rules'
 
-const props = defineProps<{ rule: Rule; index: number; canUp: boolean; canDown: boolean }>()
+const props = defineProps<{ rule: Rule; canUp: boolean; canDown: boolean }>()
 const emit = defineEmits<{
   (e: 'update:rule', rule: Rule): void
   (e: 'remove'): void
   (e: 'move', dir: -1 | 1): void
 }>()
 
-const label = computed(() => RULE_LABEL[props.rule.type as RuleType])
+const label = computed(() => RULE_LABEL[props.rule.type])
 
 function setType(t: RuleType) {
   emit('update:rule', createRule(t))
@@ -19,14 +19,14 @@ function setType(t: RuleType) {
 <template>
   <div class="space-y-3 rounded-lg border p-3">
     <div class="flex items-center gap-2">
-      <button class="text-sm font-medium" @click="setType(rule.type)">{{ label }}</button>
+      <span class="text-sm font-medium">{{ label }}</span>
       <select class="rounded-md border border-input bg-background px-2 py-1 text-xs" :value="rule.type" @change="setType(($event.target as HTMLSelectElement).value as RuleType)">
         <option v-for="t in RULE_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
       </select>
       <div class="ml-auto flex items-center gap-1">
-        <button class="rounded border border-input px-1.5 text-xs disabled:opacity-40" :disabled="!canUp" @click="emit('move', -1)">↑</button>
-        <button class="rounded border border-input px-1.5 text-xs disabled:opacity-40" :disabled="!canDown" @click="emit('move', 1)">↓</button>
-        <button class="rounded border border-input px-1.5 text-xs hover:bg-destructive/10 hover:text-destructive" @click="emit('remove')">✕</button>
+        <button type="button" aria-label="上移" class="rounded border border-input px-1.5 text-xs disabled:opacity-40" :disabled="!canUp" @click="emit('move', -1)">↑</button>
+        <button type="button" aria-label="下移" class="rounded border border-input px-1.5 text-xs disabled:opacity-40" :disabled="!canDown" @click="emit('move', 1)">↓</button>
+        <button type="button" aria-label="删除规则" class="rounded border border-input px-1.5 text-xs hover:bg-destructive/10 hover:text-destructive" @click="emit('remove')">✕</button>
       </div>
     </div>
 
@@ -102,7 +102,7 @@ function setType(t: RuleType) {
         <label>删几位 <input v-model.number="rule.count" type="number" min="1" class="w-full rounded-md border border-input bg-background px-2 py-1"></label>
       </template>
       <label v-else>删除的字符(可多选) <input v-model="rule.chars" class="w-full rounded-md border border-input bg-background px-2 py-1" placeholder="例如 abc#"></label>
-      <details class="text-xs"><summary>高级：正则</summary><span>删除字符集暂不支持正则，请直接输入字符。</span></details>
+      <details class="text-xs"><summary>说明</summary><span>删除字符集暂不支持正则，请直接输入字符。</span></details>
     </div>
 
     <!-- 扩展名 -->
