@@ -39,6 +39,32 @@ export function splitName(name: string): [string, string] {
   return [name.slice(0, idx), name.slice(idx)]
 }
 
+/**
+ * 检测"源复用"冲突：某会更改行的新名 等于 另一会更改行的旧名（链式/互换）。
+ * 这类跨行重叠无法在一次批量提交内安全执行（写盘与撤销都会歧义），标记后由 UI 阻止应用。
+ * 返回 boolean[]，true 表示该行需标冲突。
+ */
+export function markSourceReuse(
+  rows: { old: string; new: string; changed: boolean; invalid?: string }[],
+): boolean[] {
+  const mark = new Array(rows.length).fill(false)
+  const owner = new Map<string, number>()
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (r.changed && !r.invalid) owner.set(r.old, i)
+  }
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (!(r.changed && !r.invalid)) continue
+    const j = owner.get(r.new)
+    if (j !== undefined && j !== i) {
+      mark[i] = true
+      mark[j] = true
+    }
+  }
+  return mark
+}
+
 /** 取规则中的扩展名规则（应为 0 或 1 个） */
 function extRuleOf(rules: Rule[]): Rule | undefined {
   return rules.length ? rules.find((r) => r.type === 'extension') : undefined
@@ -103,6 +129,10 @@ export function batchPreview(
     const conf2 = flagConflicts(names2)
     rows.forEach((r, i) => { r.conflict = conf2[i] })
   }
+
+  // 链式/互换源复用：标冲突以阻止应用（见 markSourceReuse 说明）
+  const reuse = markSourceReuse(rows)
+  rows.forEach((r, i) => { if (reuse[i]) r.conflict = true })
 
   return rows
 }

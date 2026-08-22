@@ -1,6 +1,6 @@
 // preview.ts 逻辑自检脚本
 // 运行：node scripts/verify-rename-preview.ts
-import { batchPreview, type FileEntry2 } from '../src/lib/rename/preview.ts'
+import { batchPreview, markSourceReuse, type FileEntry2 } from '../src/lib/rename/preview.ts'
 import type { Rule } from '../src/lib/rename/rules.ts'
 
 let failed = 0
@@ -59,6 +59,16 @@ check('多扩展名替换最后一段', s2[0].new === 'a.tar.py')
 
 console.log('空文件列表')
 check('空数组', batchPreview([], []).length === 0)
+
+console.log('源复用（链/环）')
+const reuse = markSourceReuse([
+  { old: 'b', new: 'a', changed: true },
+  { old: 'c', new: 'b', changed: true },
+  { old: 'x', new: 'x', changed: false },
+])
+check('链式源复用都标冲突', reuse[0] === true && reuse[1] === true)
+check('未变更行不标', reuse[2] === false)
+check('自引用不算', markSourceReuse([{ old: 'a', new: 'a', changed: false }])[0] === false)
 
 console.log(failed === 0 ? '\n全部通过' : `\n${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)

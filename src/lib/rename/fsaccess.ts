@@ -65,8 +65,8 @@ export function filesToEntries(files: FileList): DirFileEntry[] {
 }
 
 /**
- * 对目录应用改名：先一次性快照本批所有旧文件内容，再依次"写目标 -> 删源"。
- * 快照先行保证链式/互换改名（一文件的新名=另一文件的旧名）也能保留每份原始内容。
+ * 对目录应用改名：逐个"写目标 -> 删源"。
+ * 预览层已阻止"源复用/重叠改名"，此处仅需：目标已存在则跳过（避免覆盖本批之外的文件）。
  * 返回失败的旧名列表；成功部分记入撤销栈。
  */
 export async function commitRenames(
@@ -75,37 +75,18 @@ export async function commitRenames(
 ): Promise<{ ok: boolean; failed: string[] }> {
   const failed: string[] = []
   const applied: { oldName: string; newName: string }[] = []
-  const vacated = new Set(ops.map((o) => o.oldName))
-  // 阶段一：快照所有旧文件内容（File/Blob 持有内存）
-  const snapshots = new Map<string, Blob>()
   for (const op of ops) {
     if (op.oldName === op.newName) continue
-    try {
-      const f = await (await dir.getFileHandle(op.oldName)).getFile()
-      snapshots.set(op.oldName, f)
-    } catch {
-      failed.push(op.oldName)
-    }
-  }
-  // 阶段二：写目标 -> 删源
-  for (const op of ops) {
-    if (op.oldName === op.newName) continue
-    const data = snapshots.get(op.oldName)
-    if (!data) {
-      if (!failed.includes(op.oldName)) failed.push(op.oldName)
-      continue
-    }
     let w: FileSystemWritableFileStream | null = null
     try {
-      // 防御：目标已存在且非本批即将腾出路径时跳过，避免覆盖无关文件
+      // 目标已存在：以失败跳过，避免覆盖本批之外的无关联文件
       const exists = await dir.getFileHandle(op.newName).then(() => true, () => false)
-      if (exists && !vacated.has(op.newName)) {
-        failed.push(op.oldName)
-        continue
-      }
+      if (exists) { failed.push(op.oldName); continue }
+      const oldHandle = await dir.getFileHandle(op.oldName)
+      const file = await oldHandle.getFile()
       const newHandle: FileSystemFileHandle = await dir.getFileHandle(op.newName, { create: true })
       w = await newHandle.createWritable()
-      await w.write(data)
+      await w.write(file)
       await w.close()
       w = null
       await dir.removeEntry(op.oldName)
