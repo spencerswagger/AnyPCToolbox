@@ -48,14 +48,14 @@ export function mergeTokens(tokens: Token[], rates?: Rates | null): Token[] {
       out.push({ ...t })
       continue
     }
+    let partValue: number
     if (t.dim === 'currency') {
       const r = rates?.rates
       if (!r || typeof r[prev.unit] !== 'number' || r[prev.unit] <= 0 || typeof r[t.unit] !== 'number' || r[t.unit] <= 0) {
         out.push({ ...t })
         continue
       }
-      const usd = prev.value / r[prev.unit] + t.value / r[t.unit]
-      prev.value = usd * r[prev.unit]
+      partValue = (t.value / r[t.unit]) * r[prev.unit]
     } else {
       const uPrev = findUnit(t.dim, prev.unit)
       const uCur = findUnit(t.dim, t.unit)
@@ -63,10 +63,18 @@ export function mergeTokens(tokens: Token[], rates?: Rates | null): Token[] {
         out.push({ ...t })
         continue
       }
-      prev.value = (prev.value * uPrev.factor + t.value * uCur.factor) / uPrev.factor
+      partValue = (t.value * uCur.factor) / uPrev.factor
     }
-    prev.raw = prev.merged ? prev.raw + frag : (prev.symbol ? prev.raw : prev.raw + (prev.unit ?? '')) + frag
-    prev.merged = true
+    prev.value += partValue
+    const firstText = prev.symbol ? prev.raw : prev.raw + (prev.unit ?? '')
+    if (!prev.parts) {
+      prev.parts = []
+      prev.merged = true
+      prev.raw = firstText
+      prev.parts.push({ text: firstText, value: prev.value - partValue })
+    }
+    prev.raw += frag
+    prev.parts.push({ text: frag, value: partValue })
   }
   return out
 }

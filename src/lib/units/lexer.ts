@@ -15,6 +15,14 @@ export interface Token {
   error?: string
   /** 由 mergeTokens 合并而成：raw 已含各片段单位文本 */
   merged?: boolean
+  /** 合并片段明细（merged 时存在） */
+  parts?: TokenPart[]
+}
+
+/** 合并片段：text 为含单位原文（如 "3min"），value 为以合并展示单位为基准的数值 */
+export interface TokenPart {
+  text: string
+  value: number
 }
 
 // 前置货币符号（多字符优先），最长匹配

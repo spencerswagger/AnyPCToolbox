@@ -148,12 +148,20 @@ const TEMP_FORMULA: Record<string, Record<string, string>> = {
 
 function directRule(e: Entry, eq: Equivalent): string {
   if (eq.noRate) return '无汇率数据'
-  const src = e.token.unit ?? ''
+  const t = e.token
+  // 合并项：逐片段给出到悬停目标的换算，并附合计
+  if (t.merged && t.parts?.length) {
+    const v = t.value ?? 0
+    const scale = v === 0 ? 0 : eq.value / v
+    const items = t.parts.map((p) => `${p.text} = ${formatValue(p.value * scale)} ${eq.unit}`)
+    return `${items.join('；')}；合计 ${formatValue(eq.value)} ${eq.unit}`
+  }
+  const src = t.unit ?? ''
   if (e.result?.dim === 'temperature') {
     const f = TEMP_FORMULA[src]?.[eq.unit]
     return f ? `公式：${f}` : '基准单位'
   }
-  const v = e.token.value
+  const v = t.value
   if (v === undefined) return `1 ${src} = ${formatValue(eq.value)} ${eq.unit}`
   if (v === 0) return `0 ${src} = ${formatValue(eq.value)} ${eq.unit}`
   return `1 ${src} = ${formatValue(eq.value / v)} ${eq.unit}`
