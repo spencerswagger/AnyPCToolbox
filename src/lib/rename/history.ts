@@ -4,12 +4,6 @@
 const DB_NAME = 'rename'
 const STORE = 'history'
 
-/** 一次改名里的一条记录（旧->新） */
-export interface RenameOp {
-  dir: FileSystemDirectoryHandle
-  oldName: string
-  newName: string
-}
 /** 一次应用的一组操作（对应一次"应用更改"） */
 export interface HistoryBatch {
   id?: number
@@ -40,6 +34,8 @@ export async function pushHistory(batch: HistoryBatch): Promise<number> {
     const req = tx.objectStore(STORE).add(batch)
     req.onsuccess = () => resolve(req.result as number)
     req.onerror = () => reject(req.error)
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
   })
 }
 
@@ -59,16 +55,21 @@ export async function peekHistory(): Promise<HistoryBatch | null> {
 }
 
 export async function popHistory(): Promise<HistoryBatch | null> {
-  const batch = await peekHistory()
-  if (!batch || batch.id == null) return batch
   const d = await open()
-  await new Promise<void>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const tx = d.transaction(STORE, 'readwrite')
-    const req = tx.objectStore(STORE).delete(batch.id!)
-    req.onsuccess = () => resolve()
-    req.onerror = () => reject(req.error)
+    const store = tx.objectStore(STORE)
+    const curReq = store.openCursor(null, 'prev')
+    curReq.onsuccess = () => {
+      const cur = curReq.result
+      if (!cur) { resolve(null); return }
+      const batch = cur.value as HistoryBatch
+      cur.delete()
+      tx.oncomplete = () => resolve(batch)
+    }
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
   })
-  return batch
 }
 
 export async function clearHistory(): Promise<void> {
@@ -78,5 +79,7 @@ export async function clearHistory(): Promise<void> {
     const req = tx.objectStore(STORE).clear()
     req.onsuccess = () => resolve()
     req.onerror = () => reject(req.error)
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
   })
 }
