@@ -138,17 +138,7 @@ async function copyValue(text: string): Promise<void> {
   }
 }
 
-// ---- 悬停 tooltip：匹配规则 + 直接换算规则 ----
-function matchText(e: Entry): string {
-  const t = e.token
-  const dimLabel = e.result?.dimLabel ?? ''
-  const sourceName = e.result?.sourceName ?? ''
-  if (t.symbol) return `符号 ${t.symbol} → ${t.unit ?? ''}（${dimLabel}）`
-  if (t.unit) return `${t.unit} 匹配为 ${sourceName}（${dimLabel}）`
-  return dimLabel
-}
-
-// 温度非线性：无固定比率，按 源单位 → 目标单位 给出换算公式
+// ---- 悬停 tooltip：直接换算规则 ----
 const TEMP_FORMULA: Record<string, Record<string, string>> = {
   '℃': { '℉': '℉ = ℃ × 9/5 + 32', K: 'K = ℃ + 273.15' },
   '℉': { '℃': '℃ = (℉ − 32) × 5/9', K: 'K = (℉ + 459.67) × 5/9' },
@@ -203,7 +193,7 @@ function sourceHost(url: string): string {
 </script>
 
 <template>
-  <TooltipProvider>
+  <TooltipProvider :delay-duration="0">
   <div class="space-y-6">
     <!-- 顶栏 -->
     <div class="flex items-center gap-2">
@@ -289,10 +279,7 @@ function sourceHost(url: string): string {
                 side="bottom"
                 class="z-50 max-w-xs rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
               >
-                <div class="space-y-1">
-                  <p><span class="font-medium">匹配规则：</span>{{ matchText(e) }}</p>
-                  <p><span class="font-medium">换算规则：</span>{{ directRule(e, eq) }}</p>
-                </div>
+                {{ directRule(e, eq) }}
               </TooltipContent>
             </TooltipPortal>
           </TooltipRoot>
