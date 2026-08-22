@@ -116,7 +116,7 @@ function flashStatus(msg: string): void {
     </div>
 
     <!-- 主体：左输入 + 右结果（占满视口高度，内部各自滚动） -->
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr,1.6fr] md:h-[calc(100dvh-8.5rem)]">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr,1.6fr] md:h-[calc(100dvh-10.5rem)]">
       <!-- 左：输入区 -->
       <div class="flex min-h-0 flex-col rounded-lg border">
         <div class="flex items-center justify-between border-b px-3 py-2">
