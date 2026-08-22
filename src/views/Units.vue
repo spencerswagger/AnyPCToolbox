@@ -149,7 +149,7 @@ const TEMP_FORMULA: Record<string, Record<string, string>> = {
 function directRule(e: Entry, eq: Equivalent): string[] {
   if (eq.noRate) return ['无汇率数据']
   const t = e.token
-  // 合并项：逐片段给出 1 单位到悬停目标的直接换算比率，同单位跳过，末尾附合计
+  // 合并项：逐片段给出 1 单位到悬停目标的直接换算比率，同单位跳过
   if (t.merged && t.parts?.length) {
     const dim = e.result?.dim
     const rates = rateState.value?.rates ?? null
@@ -162,7 +162,6 @@ function directRule(e: Entry, eq: Equivalent): string[] {
         lines.push(`1 ${p.unit} = ${formatValue(ratio)} ${eq.unit}`)
       }
     }
-    lines.push(`合计 ${formatValue(eq.value)} ${eq.unit}`)
     return lines
   }
   const src = t.unit ?? ''
