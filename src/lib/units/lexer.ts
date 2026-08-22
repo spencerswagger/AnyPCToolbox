@@ -1,6 +1,6 @@
 // 词法引擎：单一 token 管道，统一建模前置符号 / 后置单位 / 复合符号
 // token = [符号?] 数值 [单位?]；数值支持 整数/小数/千分位/科学计数/分数/英尺-英寸复合
-import { ALIASES, MAX_ALIAS_LEN, findUnit, type AliasDef, type Dim } from './registry.ts'
+import { ALIASES, MAX_ALIAS_LEN, type AliasDef, type Dim } from './registry.ts'
 
 export interface Token {
   /** 原始片段（含符号与数值；不含后置单位） */
@@ -102,6 +102,3 @@ export function tokenize(input: string): Token[] {
   }
   return tokens
 }
-
-// findUnit 仅用于后续量纲换算时的取用，此处显式引用避免未使用告警
-void findUnit
