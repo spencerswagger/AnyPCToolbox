@@ -40,20 +40,19 @@ export function extractTimestamps(input: string): TimestampHit[] {
   }
   // 2) 日期串
   for (const m of input.matchAll(RE_DATE)) {
-    const g = m.groups ?? {}
-    if (g['y']) {
-      const y = Number(g['y'])
+    if (m[1]) {
+      const y = Number(m[1])
       const mo = Number(m[2])
       const d = Number(m[3])
-      const hh = g['4'] ? Number(g['4']) : 0
-      const mm = g['5'] ? Number(g['5']) : 0
-      const ss = g['6'] ? Number(g['6']) : 0
+      const hh = m[4] ? Number(m[4]) : 0
+      const mm = m[5] ? Number(m[5]) : 0
+      const ss = m[6] ? Number(m[6]) : 0
       const dt = new Date(y, mo - 1, d, hh, mm, ss)
       if (!isNaN(dt.getTime()) && dt.getMonth() === mo - 1 && dt.getDate() === d) {
         hits.push(fromDate(dt, m[0], 'date'))
       }
-    } else if (g['7']) {
-      const ampm = /[Aa]/.test(g['7']) ? 0 : 12
+    } else if (m[7]) {
+      const ampm = /[Aa]/.test(m[7]) ? 0 : 12
       const parts = m[0].match(/(\d{1,2}):(\d{2})/)
       if (parts) {
         let hh = Number(parts[1]) % 12
