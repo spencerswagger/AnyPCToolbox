@@ -40,7 +40,7 @@ function applyRule(name: string, rule: Rule, ctx: BuildContext): string {
     case 'case':
       if (rule.mode === 'upper') return name.toUpperCase()
       if (rule.mode === 'lower') return name.toLowerCase()
-      return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
+      return name.charAt(0).toUpperCase() + name.slice(1)
     case 'remove':
       if (rule.mode === 'chars') {
         const set = new Set(rule.chars)

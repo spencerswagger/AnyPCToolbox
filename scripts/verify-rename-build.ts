@@ -10,6 +10,8 @@ function check(name: string, cond: boolean, detail = ''): void {
 }
 const ctx: BuildContext = { index: 0, mtime: new Date('2026-08-22T10:30:00').getTime() }
 const r = (rules: Rule[]): string => buildName('IMG_001', rules, ctx)
+const capName = (mode: 'upper' | 'lower' | 'cap'): string =>
+  buildName('img_001', [{ type: 'case', mode } as Rule], ctx)
 
 console.log('查找-替换')
 check('替换命中', r([{ type: 'replace', find: 'IMG', with: 'Photo', onlyFirst: false, regex: false }]) === 'Photo_001')
@@ -32,9 +34,9 @@ check('mtime 前位置', r([{ type: 'timestamp', format: 'YYYYMMDD', source: 'mt
 check('now 后位置', r([{ type: 'timestamp', format: 'YYYY-MM-DD', source: 'now', position: 'back', sep: '_' }]).endsWith('_2026-08-22'))
 
 console.log('大小写')
-check('全大写', r([{ type: 'case', mode: 'upper' }]) === 'IMG_001')
-check('全小写', r([{ type: 'case', mode: 'lower' }]) === 'img_001')
-check('首字母大写', r([{ type: 'case', mode: 'cap' }]) === 'Img_001')
+check('全大写', capName('upper') === 'IMG_001')
+check('全小写', capName('lower') === 'img_001')
+check('首字母大写（仅首字母）', capName('cap') === 'Img_001')
 
 console.log('删除字符')
 check('删前4位', r([{ type: 'remove', mode: 'range', start: 1, count: 4, chars: '' }]) === '001')
