@@ -39,21 +39,6 @@ export async function pushHistory(batch: HistoryBatch): Promise<number> {
   })
 }
 
-/** 返回最近的一次批（未消费则不移除） */
-export async function peekHistory(): Promise<HistoryBatch | null> {
-  const d = await open()
-  return new Promise((resolve, reject) => {
-    const tx = d.transaction(STORE, 'readonly')
-    const store = tx.objectStore(STORE)
-    const req = store.openCursor(null, 'prev')
-    req.onsuccess = () => {
-      const cur = req.result
-      resolve(cur ? (cur.value as HistoryBatch) : null)
-    }
-    req.onerror = () => reject(req.error)
-  })
-}
-
 export async function popHistory(): Promise<HistoryBatch | null> {
   const d = await open()
   return new Promise((resolve, reject) => {

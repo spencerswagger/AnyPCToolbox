@@ -19,6 +19,7 @@ const rules = ref<Rule[]>([])
 const include = ref<boolean[]>([])
 const autoNumber = ref(false)
 const undoAvailable = ref(false)
+const applied = ref(false)
 const addType = ref<RuleType>('replace')
 
 const rows = computed(() => batchPreview(files.value, rules.value, { autoNumber: autoNumber.value }))
@@ -40,6 +41,7 @@ async function handlePick() {
   files.value = res.files
   include.value = res.files.map(() => true)
   undoAvailable.value = false
+  applied.value = false
 }
 
 function handleFileInput(e: Event) {
@@ -49,6 +51,7 @@ function handleFileInput(e: Event) {
   files.value = filesToEntries(el.files)
   include.value = files.value.map(() => true)
   undoAvailable.value = false
+  applied.value = false
 }
 
 // 拖拽：FS Access 支持时取目录/文件句柄；否则回退 DataTransfer.files
@@ -80,6 +83,7 @@ function onDrop(e: DragEvent) {
       files.value = f2
       include.value = f2.map(() => true)
       undoAvailable.value = false
+      applied.value = false
     })
     return
   }
@@ -99,6 +103,7 @@ async function setFromDir(dir: FileSystemDirectoryHandle) {
   files.value = out
   include.value = out.map(() => true)
   undoAvailable.value = false
+  applied.value = false
 }
 
 function removeFile(i: number) {
@@ -106,19 +111,21 @@ function removeFile(i: number) {
   include.value.splice(i, 1)
 }
 
-function addRule() { rules.value.push(createRule(addType.value)) }
-function updateRule(i: number, r: Rule) { rules.value[i] = r }
-function removeRule(i: number) { rules.value.splice(i, 1) }
+function addRule() { rules.value.push(createRule(addType.value)); applied.value = false }
+function updateRule(i: number, r: Rule) { rules.value[i] = r; applied.value = false }
+function removeRule(i: number) { rules.value.splice(i, 1); applied.value = false }
 function moveRule(i: number, dir: -1 | 1) {
   const j = i + dir
   if (j < 0 || j >= rules.value.length) return
   const arr = [...rules.value]
   ;[arr[i], arr[j]] = [arr[j], arr[i]]
   rules.value = arr
+  applied.value = false
 }
 
 async function applyChanges() {
-  if (!isFsAccess || !dirHandle.value) { exportList(); return }
+  if (!isFsAccess) { exportList(); return }
+  if (!dirHandle.value) return // 未选文件夹（如仅拖入单个文件），按钮已禁用，不静默导出
   const targets = rows.value
     .filter((r, i) => include.value[i] && r.changed && !r.invalid)
     .map((r) => ({ oldName: r.old, newName: r.new }))
@@ -141,6 +148,7 @@ async function applyChanges() {
     if (include.value[i] && r.changed && !r.invalid) files.value[i] = { ...files.value[i], name: r.new }
   })
   include.value = include.value.map(() => true)
+  applied.value = true
   toast(undefined, `已改名 ${targets.length} 个文件`)
 }
 
@@ -169,6 +177,7 @@ async function undo() {
     if (idx >= 0) files.value[idx] = { ...files.value[idx], name: op.oldName }
   })
   undoAvailable.value = false
+  applied.value = false
   toast(undefined, failed.length ? `撤销部分失败：${failed.join(', ')}` : '已撤销')
 }
 </script>
@@ -195,7 +204,7 @@ async function undo() {
       <div class="flex flex-col items-center gap-1 border-b border-dashed px-4 py-6 text-sm text-muted-foreground" @dragover.prevent @drop="onDrop">
         <span>拖拽文件夹/文件到此处</span>
         <label class="mt-1 cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground">或选择文件
-          <input type="file" multiple class="hidden" @change="handleFileInput">
+          <input type="file" multiple class="sr-only" @change="handleFileInput">
         </label>
       </div>
       <ul v-if="files.length" class="max-h-56 overflow-auto divide-y divide-border">
@@ -252,8 +261,12 @@ async function undo() {
     <!-- 底栏 -->
     <div class="flex items-center gap-3 border-t px-4 py-2 text-xs text-muted-foreground">
       <span>共 {{ stats.total }} · 将改 {{ stats.willChange }}{{ stats.invalid ? ' · 非法 ' + stats.invalid : '' }} · 冲突 {{ stats.conflict }}</span>
-      <button v-if="isFsAccess" type="button" class="ml-auto rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40" :disabled="!stats.willChange || stats.conflict > 0 || stats.invalid > 0" @click="applyChanges">应用更改</button>
-      <button v-else type="button" class="ml-auto rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40" :disabled="!stats.willChange" @click="exportList">导出改名列表</button>
+      <div class="ml-auto flex items-center gap-3">
+        <span v-if="isFsAccess && !dirHandle" class="text-xs text-muted-foreground">未选文件夹（单文件操作只能导出）</span>
+        <span v-if="applied" class="text-xs text-emerald-600 dark:text-emerald-400">已应用，可撤销或重新选择文件/调整规则</span>
+        <button v-if="isFsAccess" type="button" class="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40" :disabled="applied || !dirHandle || !stats.willChange || stats.conflict > 0 || stats.invalid > 0" @click="applyChanges">应用更改</button>
+        <button v-else type="button" class="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40" :disabled="!stats.willChange" @click="exportList">导出改名列表</button>
+      </div>
     </div>
   </div>
 </template>
