@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToaster } from '@/lib/ui/use-toast'
-import { TooltipContent, TooltipPortal, TooltipProvider, TooltipRoot, TooltipTrigger } from 'radix-vue'
 import { tokenize, type Token } from '@/lib/units/lexer'
 import { equivalentsFor, formatValue, type EquivResult } from '@/lib/units/convert'
 import { COMMON_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/units/money'
-import { DIMS, UNITS, type Dim } from '@/lib/units/registry'
+import { ALIASES, DIMS, UNITS, type Dim, type UnitDef } from '@/lib/units/registry'
 import { loadInitialRates, onRatesUpdate, refreshRatesOnline, type RateState } from '@/lib/units/rates'
 
 const router = useRouter()
@@ -27,76 +26,61 @@ const entries = computed<Entry[]>(() =>
 const recognizedCount = computed(() => tokens.value.filter((t) => t.dim !== undefined).length)
 const unrecognizedCount = computed(() => tokens.value.length - recognizedCount.value)
 
-// ---- 手动换算 ----
-const showManual = ref(false)
-const manualDim = ref<Dim>('length')
-const manualFrom = ref('')
-const manualTo = ref('')
-const manualValue = ref('')
-const manualResult = ref<string | null>(null)
-const PREFS_KEY = 'units:pref'
+// ---- 单位匹配与换算规则详表（折叠，默认收起） ----
+const showRules = ref(false)
 
-function unitsOf(dim: Dim): Array<{ code: string; name: string }> {
-  if (dim === 'currency') return COMMON_CURRENCIES
-  return UNITS[dim].map((u) => ({ code: u.canonical, name: u.name }))
+interface RefUnit {
+  canonical: string
+  name: string
+  aliases: string
+  rule: string
+}
+interface RefSection {
+  id: Dim
+  label: string
+  base: string
+  units: RefUnit[]
 }
 
-function syncManualUnits(): void {
-  const list = unitsOf(manualDim.value)
-  if (!list.some((u) => u.code === manualFrom.value)) manualFrom.value = list[0]?.code ?? ''
-  if (!list.some((u) => u.code === manualTo.value)) manualTo.value = list[1]?.code ?? list[0]?.code ?? ''
+function fmtFactor(f: number): string {
+  return String(Number(f.toPrecision(6)))
 }
 
-function loadPrefs(): void {
-  try {
-    const raw = localStorage.getItem(PREFS_KEY)
-    if (!raw) return
-    const p = JSON.parse(raw) as { dim?: Dim; from?: string; to?: string }
-    if (p.dim && DIMS.some((d) => d.id === p.dim)) manualDim.value = p.dim
-    if (typeof p.from === 'string') manualFrom.value = p.from
-    if (typeof p.to === 'string') manualTo.value = p.to
-  } catch {
-    // 解析失败 → 默认偏好
-  }
-  syncManualUnits()
+function aliasesOf(canonical: string): string {
+  return Object.keys(ALIASES)
+    .filter((k) => ALIASES[k].canonical === canonical)
+    .join('、')
 }
 
-function savePrefs(): void {
-  try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ dim: manualDim.value, from: manualFrom.value, to: manualTo.value }))
-  } catch {
-    // 存储失败静默
-  }
+function unitRule(u: UnitDef, base: string): string {
+  if (u.factor !== undefined) return u.factor === 1 ? '基准单位' : `1 ${u.canonical} = ${fmtFactor(u.factor)} ${base}`
+  if (u.canonical === '℃') return '基准单位'
+  if (u.canonical === '℉') return '℃ = (℉ − 32) × 5/9'
+  return '℃ = K − 273.15'
 }
 
-watch([manualDim, manualFrom, manualTo], () => {
-  syncManualUnits()
-  savePrefs()
-})
-
-function handleManualConvert(): void {
-  const raw = manualValue.value.trim()
-  const v = Number(raw)
-  if (!raw || Number.isNaN(v)) {
-    manualResult.value = null
-    toast(undefined, '请输入数值')
-    return
-  }
-  if (!manualFrom.value || !manualTo.value) {
-    manualResult.value = null
-    toast(undefined, '请选择源单位与目标单位')
-    return
-  }
-  const tok: Token = { raw: `${v} ${manualFrom.value}`, value: v, unit: manualFrom.value, dim: manualDim.value }
-  const res = equivalentsFor(tok, rateState.value?.rates ?? null)
-  const eq = res?.equivalents.find((e) => e.unit === manualTo.value)
-  if (!eq) {
-    manualResult.value = null
-    toast(undefined, '该量纲不支持此换算')
-    return
-  }
-  manualResult.value = formatValue(eq.value)
-}
+const referenceSections = computed<RefSection[]>(() =>
+  DIMS.map((d) => {
+    if (d.id === 'currency') {
+      const units: RefUnit[] = COMMON_CURRENCIES.map((c) => {
+        const sym = CURRENCY_SYMBOLS.find((s) => s.code === c.code)
+        const names = Object.keys(ALIASES).filter(
+          (k) => ALIASES[k].dim === 'currency' && ALIASES[k].canonical === c.code,
+        )
+        const aliases = [...(sym ? [sym.symbols] : []), ...names].join('、')
+        return { canonical: c.code, name: c.name, aliases, rule: '汇率换算（基准 USD）' }
+      })
+      return { id: d.id, label: d.label, base: d.base, units }
+    }
+    const units: RefUnit[] = UNITS[d.id].map((u) => ({
+      canonical: u.canonical,
+      name: u.name,
+      aliases: aliasesOf(u.canonical),
+      rule: unitRule(u, d.base),
+    }))
+    return { id: d.id, label: d.label, base: d.base, units }
+  }),
+)
 
 // ---- 主换算 ----
 function handleConvert(): void {
@@ -143,7 +127,13 @@ function formatDate(iso: string | undefined): string {
   return `${y}-${mo}-${day}`
 }
 
-loadPrefs()
+function sourceHost(url: string): string {
+  try {
+    return new URL(url).host
+  } catch {
+    return url
+  }
+}
 </script>
 
 <template>
@@ -158,44 +148,6 @@ loadPrefs()
       </button>
       <span class="text-muted-foreground">|</span>
       <h2 class="text-lg font-semibold">单位换算</h2>
-      <div class="ml-auto">
-        <TooltipProvider>
-          <TooltipRoot>
-            <TooltipTrigger as-child>
-              <button
-                class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-input text-sm font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring outline-none"
-              >
-                ?
-              </button>
-            </TooltipTrigger>
-            <TooltipPortal>
-              <TooltipContent
-                side="bottom"
-                align="end"
-                class="z-50 max-w-xs rounded-lg border bg-card p-3 text-sm text-card-foreground shadow-lg"
-              >
-                <p class="mb-2 font-medium">货币符号对照表</p>
-                <table class="w-full text-xs">
-                  <thead>
-                    <tr class="text-muted-foreground">
-                      <th class="pb-1 text-left font-normal">符号</th>
-                      <th class="pb-1 text-left font-normal">币种</th>
-                      <th class="pb-1 text-left font-normal">代码</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="c in CURRENCY_SYMBOLS" :key="c.code" class="border-t border-border/50">
-                      <td class="py-0.5 pr-2 font-mono">{{ c.symbols }}</td>
-                      <td class="py-0.5 pr-2">{{ c.name }}</td>
-                      <td class="py-0.5 font-mono">{{ c.code }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </TooltipContent>
-            </TooltipPortal>
-          </TooltipRoot>
-        </TooltipProvider>
-      </div>
     </div>
 
     <!-- 输入区 -->
@@ -270,74 +222,54 @@ loadPrefs()
       未识别到数值片段
     </div>
 
-    <!-- 手动选择表（折叠，默认收起） -->
+    <!-- 单位匹配与换算规则详表（折叠，默认收起） -->
     <div class="rounded-lg border">
       <button
         class="flex w-full items-center justify-between px-4 py-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        @click="showManual = !showManual"
+        @click="showRules = !showRules"
       >
-        手动选择换算
-        <span class="text-muted-foreground">{{ showManual ? '▲' : '▼' }}</span>
+        单位匹配与换算规则
+        <span class="text-muted-foreground">{{ showRules ? '▲' : '▼' }}</span>
       </button>
-      <div v-if="showManual" class="space-y-3 border-t px-4 py-4 text-sm">
-        <div class="grid gap-3 sm:grid-cols-3">
-          <label class="flex items-center gap-2">
-            <span class="w-12 shrink-0 text-muted-foreground">量纲</span>
-            <select
-              v-model="manualDim"
-              class="h-8 flex-1 rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option v-for="d in DIMS" :key="d.id" :value="d.id">{{ d.label }}</option>
-            </select>
-          </label>
-          <label class="flex items-center gap-2">
-            <span class="w-12 shrink-0 text-muted-foreground">源单位</span>
-            <select
-              v-model="manualFrom"
-              class="h-8 flex-1 rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option v-for="u in unitsOf(manualDim)" :key="u.code" :value="u.code">{{ u.name }}</option>
-            </select>
-          </label>
-          <label class="flex items-center gap-2">
-            <span class="w-12 shrink-0 text-muted-foreground">目标</span>
-            <select
-              v-model="manualTo"
-              class="h-8 flex-1 rounded-md border border-input bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option v-for="u in unitsOf(manualDim)" :key="u.code" :value="u.code">{{ u.name }}</option>
-            </select>
-          </label>
-        </div>
-        <div class="flex items-center gap-3">
-          <input
-            v-model="manualValue"
-            type="text"
-            inputmode="decimal"
-            spellcheck="false"
-            placeholder="数值"
-            class="h-8 w-32 rounded-md border border-input bg-background px-2 font-mono outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            @keydown.enter.prevent="handleManualConvert"
-          />
-          <span class="text-muted-foreground">=</span>
-          <span v-if="manualResult !== null" class="font-mono text-primary">{{ manualResult }} {{ manualTo }}</span>
-          <span v-else class="text-muted-foreground">—</span>
-          <button
-            class="ml-auto rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring outline-none"
-            @click="handleManualConvert"
-          >
-            换算
-          </button>
+      <div v-if="showRules" class="border-t p-4 text-sm">
+        <div v-for="s in referenceSections" :key="s.id" class="mb-6 last:mb-0">
+          <h3 class="mb-2 font-semibold">{{ s.label }}（基准单位：{{ s.base }}）</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full border rounded-md">
+              <thead>
+                <tr class="bg-muted/50">
+                  <th class="border p-2 text-left text-xs">单位符号</th>
+                  <th class="border p-2 text-left text-xs">单位名称</th>
+                  <th class="border p-2 text-left text-xs">别名</th>
+                  <th class="border p-2 text-left text-xs">换算规则</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="u in s.units" :key="u.canonical" class="hover:bg-muted/50">
+                  <td class="border p-2 font-mono">{{ u.canonical }}</td>
+                  <td class="border p-2">{{ u.name }}</td>
+                  <td class="border p-2 max-w-xs truncate">{{ u.aliases }}</td>
+                  <td class="border p-2 font-mono text-xs">{{ u.rule }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-if="s.id === 'currency'" class="mt-1 text-xs text-muted-foreground">
+            支持全部 ISO 4217 币种（如 KRW、INR 等），汇率均以 USD 为基准换算。
+          </p>
         </div>
       </div>
     </div>
 
     <!-- 底部状态栏 -->
     <div class="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
-      <span v-if="rateState"
-        >汇率：{{ rateState.source
-        }}<template v-if="formatDate(rateState.rates._updatedAt)"> · {{ formatDate(rateState.rates._updatedAt) }}</template></span
-      >
+      <div v-if="rateState" class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span
+          >汇率来源：<span class="font-medium text-foreground">{{ rateState.source }}</span></span
+        >
+        <span v-if="rateState.rates._source" class="font-mono">{{ sourceHost(rateState.rates._source) }}</span>
+        <span v-if="formatDate(rateState.rates._updatedAt)">更新于 {{ formatDate(rateState.rates._updatedAt) }}</span>
+      </div>
       <span v-else>汇率加载中…</span>
       <span>识别 {{ recognizedCount }} 段 · 无法识别 {{ unrecognizedCount }} 段</span>
     </div>
