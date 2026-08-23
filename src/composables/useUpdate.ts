@@ -124,6 +124,18 @@ async function applyUpdate(): Promise<void> {
         }
       })
       status.value = 'ready'
+      // 安装完成后延迟片刻让 UI 展示"已安装"，再强制拉起新版本进程
+      setTimeout(() => {
+        void (async () => {
+          try {
+            const { relaunch } = await import('@tauri-apps/plugin-process')
+            await relaunch()
+          } catch (err) {
+            errorMessage.value = err instanceof Error ? err.message : String(err)
+            status.value = 'error'
+          }
+        })()
+      }, 800)
     } catch (err) {
       status.value = 'error'
       errorMessage.value = err instanceof Error ? err.message : String(err)
