@@ -64,19 +64,11 @@ const cryptoTools: ToolItem[] = Object.keys(CRYPTO_LABELS).map((algo) => ({
   props: { algo },
 }))
 
-// 哈希：SHA-1/256/512 合并到同一个「SHA」tab，MD5 / CRC32 各一个 tab
-const HASH_LABELS: Record<string, string> = {
-  md5: 'MD5',
-  crc32: 'CRC32',
-  sha: 'SHA',
-}
-const hashTools: ToolItem[] = Object.keys(HASH_LABELS).map((algo) => ({
-  id: algo,
-  label: HASH_LABELS[algo],
-  category: 'hash',
-  component: HashPanel,
-  props: { algo },
-}))
+// 哈希：MD5 + SHA 系列 + SM3 合并到第一个「常用」tab；CRC32 单独一个 tab
+const hashTools: ToolItem[] = [
+  { id: 'common', label: '常用', category: 'hash', component: HashPanel, props: { algo: 'common' } },
+  { id: 'crc32', label: 'CRC32', category: 'hash', component: HashPanel, props: { algo: 'crc32' } },
+]
 
 // 国密：SM2 加密/签名、SM3 哈希、SM4 加解密（SM2 两面板共享密钥对 store）
 const smTools: ToolItem[] = [
