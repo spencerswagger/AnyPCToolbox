@@ -59,7 +59,7 @@ function checkHex32(value: string, subject: string): { ok: true; value: string }
 /** 密钥解析：接受 32 位 hex 或恰好 16 字节的 utf8 字符串，统一转为 16 字节 hex */
 function resolveKey(key: string): { ok: true; value: string } | { ok: false; error: string } {
   const k = key.trim()
-  if (!k) return err('SM4 解密失败：缺少密钥')
+  if (!k) return err('SM4 失败：缺少密钥')
   if (/^[0-9a-fA-F]{32}$/.test(k)) return { ok: true, value: k.toLowerCase() }
   const bytes = new TextEncoder().encode(k)
   if (bytes.length !== 16) return err('SM4 密钥需为 32 位十六进制或恰好 16 字节的字符串')
