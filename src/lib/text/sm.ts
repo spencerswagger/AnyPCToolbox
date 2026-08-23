@@ -8,7 +8,6 @@ const { sm2: _sm2, sm3: _sm3, sm4: _sm4 } = smcrypto
 export type SmResult = { ok: true; value: string } | { ok: false; error: string }
 
 const err = (error: string): SmResult => ({ ok: false, error })
-const CIPHER_MODE = 1 // C1C3C2（GmSSL 标准）
 
 // ---------- 字节工具 ----------
 function hexToBytes(hex: string): Uint8Array {
@@ -126,38 +125,60 @@ export function sm2GenerateKeyPair(): { publicKey: string; privateKey: string } 
   return { ...kp }
 }
 
-export function sm2Encrypt(text: string, publicKey: string): SmResult {
+/** SM2 密文格式：0 = C1C2C3（<64 字节哈希靠前），1 = C1C3C2（GM 标准） */
+export type Sm2CipherMode = 0 | 1
+
+export function sm2Encrypt(text: string, publicKey: string, cipherMode: Sm2CipherMode = 1): SmResult {
   if (!publicKey.trim()) return err('SM2 加密失败：缺少公钥')
   try {
-    return { ok: true, value: _sm2.doEncrypt(text, publicKey.trim(), CIPHER_MODE) }
+    return { ok: true, value: _sm2.doEncrypt(text, publicKey.trim(), cipherMode) }
   } catch {
     return err('SM2 加密失败：公钥无效')
   }
 }
 
-export function sm2Decrypt(cipher: string, privateKey: string): SmResult {
+export function sm2Decrypt(cipher: string, privateKey: string, cipherMode: Sm2CipherMode = 1): SmResult {
   if (!privateKey.trim()) return err('SM2 解密失败：缺少私钥')
   try {
-    return { ok: true, value: _sm2.doDecrypt(cipher.trim(), privateKey.trim(), CIPHER_MODE) }
+    const plain = _sm2.doDecrypt(cipher.trim(), privateKey.trim(), cipherMode)
+    if (!plain) return err('SM2 解密失败：密文格式/密钥不匹配或密文损坏')
+    return { ok: true, value: plain }
   } catch {
     return err('SM2 解密失败：密文或私钥无效')
   }
 }
 
-export function sm2Sign(text: string, privateKey: string): SmResult {
+/** SM2 签名/验签参数 */
+export interface Sm2SignOptions {
+  /** 是否先做 SM3 杂凑（默认 true，对应 SM2 标准签名） */
+  hash?: boolean
+  /** 签名是否采用 ASN.1 DER 编码（默认 false，输出 r||s 各 64 位 hex） */
+  der?: boolean
+  /** 杂凑过程使用的 userId（仅 hash=true 时生效，默认 '1234567812345678'） */
+  userId?: string
+}
+
+function signOptions(opts: Sm2SignOptions = {}): Record<string, unknown> {
+  const options: Record<string, unknown> = { hash: opts.hash !== false }
+  if (opts.der) options.der = true
+  if (opts.userId) options.userId = opts.userId
+  return options
+}
+
+export function sm2Sign(text: string, privateKey: string, opts?: Sm2SignOptions): SmResult {
   if (!privateKey.trim()) return err('SM2 签名失败：缺少私钥')
   try {
-    return { ok: true, value: _sm2.doSignature(text, privateKey.trim()) }
+    return { ok: true, value: _sm2.doSignature(text, privateKey.trim(), signOptions(opts)) }
   } catch {
     return err('SM2 签名失败：私钥无效')
   }
 }
 
-export function sm2Verify(text: string, signatureHex: string, publicKey: string): SmResult {
+export function sm2Verify(text: string, signatureHex: string, publicKey: string, opts?: Sm2SignOptions): SmResult {
   if (!signatureHex.trim()) return err('SM2 验签：缺少签名')
   if (!publicKey.trim()) return err('SM2 验签：缺少公钥')
   try {
-    const pass = _sm2.doVerifySignature(text, signatureHex.trim(), publicKey.trim())
+    const pass = _sm2.doVerifySignature(text, signatureHex.trim(), publicKey.trim(), signOptions(opts))
     return { ok: true, value: pass ? '验签通过' : '验签失败' }
   } catch {
     return err('SM2 验签失败：签名或公钥无效')

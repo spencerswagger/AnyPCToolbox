@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { sm2Keypair, sm2GenerateKeyPair, sm2Encrypt, sm2Decrypt, type SmResult } from '@/lib/text/sm'
+import { sm2Keypair, sm2GenerateKeyPair, sm2Encrypt, sm2Decrypt, type SmResult, type Sm2CipherMode } from '@/lib/text/sm'
 
 const props = defineProps<{ input: string }>()
 
@@ -20,6 +20,7 @@ const privateKey = computed({
 const enc = ref<SmResult | null>(null)
 const dec = ref<SmResult | null>(null)
 const working = ref(false)
+const cipherMode = ref<Sm2CipherMode>(1)
 
 function gen(): void {
   sm2GenerateKeyPair()
@@ -29,8 +30,8 @@ function gen(): void {
 function run(): void {
   if (!props.input) return
   working.value = true
-  enc.value = sm2Encrypt(props.input, publicKey.value)
-  dec.value = sm2Decrypt(props.input, privateKey.value)
+  enc.value = sm2Encrypt(props.input, publicKey.value, cipherMode.value)
+  dec.value = sm2Decrypt(props.input, privateKey.value, cipherMode.value)
   working.value = false
 }
 async function copy(text: string): Promise<void> {
@@ -45,7 +46,13 @@ async function copy(text: string): Promise<void> {
 <template>
   <div class="space-y-3">
     <div class="flex flex-wrap items-center gap-3 rounded-lg border p-3">
-      <span class="text-sm text-muted-foreground">SM2 密文格式：C1C3C2（标准）Hex</span>
+      <label class="flex items-center gap-1.5 text-sm">
+        <span class="text-muted-foreground">密文格式</span>
+        <select v-model="cipherMode" class="rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <option :value="1">C1C3C2（GM 标准）</option>
+          <option :value="0">C1C2C3</option>
+        </select>
+      </label>
       <button :disabled="working" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring outline-none" @click="gen">生成密钥对</button>
       <button :disabled="working || !input" class="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring outline-none" @click="run">{{ working ? '计算中…' : '加解密' }}</button>
     </div>
