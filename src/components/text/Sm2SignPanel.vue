@@ -115,10 +115,7 @@ async function copy(text: string): Promise<void> {
           <button class="ml-auto inline-flex items-center justify-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring outline-none" :disabled="!input" @click="runVerify">验签</button>
         </div>
         <div class="space-y-1.5 p-3">
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-muted-foreground">签名</span>
-            <textarea v-model="sigInput" rows="3" placeholder="粘贴待验签的签名" spellcheck="false" class="w-full resize-y rounded-md border border-input bg-background p-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"></textarea>
-          </label>
+          <textarea v-model="sigInput" rows="3" placeholder="粘贴待验签的签名" spellcheck="false" class="w-full resize-y rounded-md border border-input bg-background p-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"></textarea>
           <template v-if="input">
             <pre v-if="verify?.ok" class="whitespace-pre-wrap break-all rounded-md border p-3 font-mono text-xs" :class="verify.value === '验签通过' ? 'border-green-600/40 bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400' : 'border-destructive/40 bg-destructive/10 text-destructive'">{{ verify.value }}</pre>
             <div v-else class="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
