@@ -1,5 +1,7 @@
-// 哈希：SHA 系列走 WebCrypto；MD5 / CRC32 小型自实现（增量风格）。
+// 哈希：SHA 系列走 WebCrypto；MD5 / CRC32 小型自实现（增量风格）；SM3 走 sm-crypto。
 // 对超大文本，MD5/CRC32 导出增量接口 update()/digest() 分块喂入避免卡顿。
+
+import { sm3Hash } from './sm'
 
 export type ShaAlgo = 'SHA-1' | 'SHA-256' | 'SHA-512'
 
@@ -40,19 +42,24 @@ export async function computeHashes(input: string): Promise<HashItem[]> {
   return items
 }
 
-export type HashId = 'md5' | 'crc32' | 'sha1' | 'sha256' | 'sha512'
+export type HashId = 'md5' | 'crc32' | 'sha1' | 'sha256' | 'sha512' | 'sm3'
 const HASH_LABELS: Record<HashId, string> = {
   md5: 'MD5',
   crc32: 'CRC32',
   sha1: 'SHA-1',
   sha256: 'SHA-256',
   sha512: 'SHA-512',
+  sm3: 'SM3',
 }
 
 /** 计算单个哈希，供「每种算法一个 tab」的哈希面板使用 */
 export async function computeHash(id: HashId, input: string): Promise<HashItem> {
   if (id === 'md5') return { id, label: HASH_LABELS[id], value: md5(input) }
   if (id === 'crc32') return { id, label: HASH_LABELS[id], value: crc32hex(input) }
+  if (id === 'sm3') {
+    const r = sm3Hash(input)
+    return r.ok ? { id, label: HASH_LABELS[id], value: r.value } : { id, label: HASH_LABELS[id], value: '', error: r.error }
+  }
   try {
     const algo: ShaAlgo = id === 'sha1' ? 'SHA-1' : id === 'sha256' ? 'SHA-256' : 'SHA-512'
     return { id, label: HASH_LABELS[id], value: await sha256(input, algo) }

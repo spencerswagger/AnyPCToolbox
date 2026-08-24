@@ -7,8 +7,12 @@ import SmartDecodePanel from '@/components/text/SmartDecodePanel.vue'
 const EncodePanel = defineAsyncComponent(() => import('@/components/text/EncodePanel.vue'))
 const AesPanel = defineAsyncComponent(() => import('@/components/text/AesPanel.vue'))
 const HashPanel = defineAsyncComponent(() => import('@/components/text/HashPanel.vue'))
+const Sm2EncPanel = defineAsyncComponent(() => import('@/components/text/Sm2EncPanel.vue'))
+const Sm2SignPanel = defineAsyncComponent(() => import('@/components/text/Sm2SignPanel.vue'))
+const Sm3Panel = defineAsyncComponent(() => import('@/components/text/Sm3Panel.vue'))
+const Sm4Panel = defineAsyncComponent(() => import('@/components/text/Sm4Panel.vue'))
 
-export type Category = 'smart' | 'encode' | 'hash' | 'aes' | 'analyze'
+export type Category = 'smart' | 'encode' | 'hash' | 'aes' | 'sm' | 'analyze'
 
 export interface ToolItem {
   id: string
@@ -23,6 +27,7 @@ export const CATEGORIES: { id: Category; label: string }[] = [
   { id: 'encode', label: '编解码' },
   { id: 'hash', label: '哈希摘要' },
   { id: 'aes', label: '加解密' },
+  { id: 'sm', label: '国密' },
   { id: 'analyze', label: '分析' },
 ]
 
@@ -59,24 +64,25 @@ const cryptoTools: ToolItem[] = Object.keys(CRYPTO_LABELS).map((algo) => ({
   props: { algo },
 }))
 
-// 哈希：SHA-1/256/512 合并到同一个「SHA」tab，MD5 / CRC32 各一个 tab
-const HASH_LABELS: Record<string, string> = {
-  md5: 'MD5',
-  crc32: 'CRC32',
-  sha: 'SHA',
-}
-const hashTools: ToolItem[] = Object.keys(HASH_LABELS).map((algo) => ({
-  id: algo,
-  label: HASH_LABELS[algo],
-  category: 'hash',
-  component: HashPanel,
-  props: { algo },
-}))
+// 哈希：MD5 + SHA 系列 + SM3 合并到第一个「常用」tab；CRC32 单独一个 tab
+const hashTools: ToolItem[] = [
+  { id: 'common', label: '常用', category: 'hash', component: HashPanel, props: { algo: 'common' } },
+  { id: 'crc32', label: 'CRC32', category: 'hash', component: HashPanel, props: { algo: 'crc32' } },
+]
+
+// 国密：SM2 加密/签名、SM3 哈希、SM4 加解密（SM2 两面板共享密钥对 store）
+const smTools: ToolItem[] = [
+  { id: 'sm2-enc', label: 'SM2 加密', category: 'sm', component: Sm2EncPanel },
+  { id: 'sm2-sign', label: 'SM2 签名', category: 'sm', component: Sm2SignPanel },
+  { id: 'sm3', label: 'SM3', category: 'sm', component: Sm3Panel },
+  { id: 'sm4', label: 'SM4', category: 'sm', component: Sm4Panel },
+]
 
 export const TOOL_ITEMS: ToolItem[] = [
   ...encodeTools,
   ...hashTools,
   ...cryptoTools,
+  ...smTools,
   { id: 'stats', label: '统计', category: 'analyze', component: StatsPanel },
   { id: 'timestamp', label: '时间戳', category: 'analyze', component: TimestampPanel },
 ]

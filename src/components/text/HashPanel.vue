@@ -1,21 +1,20 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { sha256, computeHash, type HashId } from '@/lib/text/hashes'
+import { ref, watch, computed } from 'vue'
+import { computeHash, type HashId } from '@/lib/text/hashes'
 
 const props = defineProps<{ input: string; algo: string }>()
 
-const LABELS: Record<string, string> = {
-  md5: 'MD5',
-  crc32: 'CRC32',
-  sha: 'SHA',
-}
-
-// SHA 变体：合并显示在同一个「SHA」tab 下
-const SHA_ROWS: { algo: string; label: string }[] = [
-  { algo: 'SHA-1', label: 'SHA-1' },
-  { algo: 'SHA-256', label: 'SHA-256' },
-  { algo: 'SHA-512', label: 'SHA-512' },
+// “常用”tab 聚合常见哈希：MD5 + SHA 系列 + SM3
+const COMMON_HASHES: { id: HashId; label: string }[] = [
+  { id: 'md5', label: 'MD5' },
+  { id: 'sha1', label: 'SHA-1' },
+  { id: 'sha256', label: 'SHA-256' },
+  { id: 'sha512', label: 'SHA-512' },
+  { id: 'sm3', label: 'SM3' },
 ]
+
+const isCommon = computed(() => props.algo === 'common')
+const title = computed(() => (isCommon.value ? '常用哈希' : '哈希')) // 空态提示用
 
 interface Row {
   label: string
@@ -30,26 +29,18 @@ const upper = ref(false)
 watch(
   () => [props.input, props.algo] as const,
   async () => {
+    rows.value = []
     if (!props.input) {
-      rows.value = []
       return
     }
     computing.value = true
     try {
-      if (props.algo === 'sha') {
-        const [a, b, c] = await Promise.all([
-          sha256(props.input, 'SHA-1'),
-          sha256(props.input, 'SHA-256'),
-          sha256(props.input, 'SHA-512'),
-        ])
-        rows.value = [
-          { label: SHA_ROWS[0].label, value: a, error: '' },
-          { label: SHA_ROWS[1].label, value: b, error: '' },
-          { label: SHA_ROWS[2].label, value: c, error: '' },
-        ]
+      if (isCommon.value) {
+        const results = await Promise.all(COMMON_HASHES.map((r) => computeHash(r.id, props.input)))
+        rows.value = results.map((r) => ({ label: r.label, value: r.value, error: r.error ?? '' }))
       } else {
         const r = await computeHash(props.algo as HashId, props.input)
-        rows.value = [{ label: LABELS[props.algo] ?? r.label, value: r.value, error: r.error ?? '' }]
+        rows.value = [{ label: r.label, value: r.value, error: r.error ?? '' }]
       }
     } finally {
       computing.value = false
@@ -74,7 +65,7 @@ async function copy(text: string): Promise<void> {
 <template>
   <div class="space-y-3">
     <div v-if="computing" class="text-sm text-muted-foreground">计算中…</div>
-    <div v-else-if="!input" class="text-sm text-muted-foreground">输入文本开始计算 {{ LABELS[algo] }}</div>
+    <div v-else-if="!input" class="text-sm text-muted-foreground">输入文本开始计算 {{ title }}</div>
     <template v-else>
       <label class="flex w-fit items-center gap-2 text-sm">
         <input
