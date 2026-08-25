@@ -178,12 +178,18 @@
     return 'Other';
   }
 
-  function normalizeArch(a) {
+  function normalizeArch(a, b) {
     if (!a) return null;
     a = String(a).toLowerCase();
+    b = b == null ? '' : String(b);
+    if (a === 'x86') {
+      // UA-CH 的 architecture 提示对 32/64 位 x86 都返回 "x86"，
+      // 必须结合 bitness（"32"/"64"）才能区分 amd64 与 32 位 x86。
+      return b === '32' ? 'x86' : 'amd64';
+    }
     if (a === 'x86-64' || a === 'x64' || a === 'amd64') return 'amd64';
     if (a === 'arm64' || a === 'arm') return 'arm64';
-    if (a === 'x86' || a === 'ia-32') return 'x86';
+    if (a === 'ia-32') return 'x86';
     return a;
   }
 
@@ -202,8 +208,8 @@
     var chromium = isChromium(nav);
     var resolved = { os: osName, arch: null, reliable: false, chromium: chromium };
     if (chromium && nav.userAgentData && typeof nav.userAgentData.getHighEntropyValues === 'function') {
-      return nav.userAgentData.getHighEntropyValues(['architecture']).then(function (hv) {
-        if (hv && hv.architecture) { resolved.arch = normalizeArch(hv.architecture); resolved.reliable = true; }
+      return nav.userAgentData.getHighEntropyValues(['architecture', 'bitness']).then(function (hv) {
+        if (hv && hv.architecture) { resolved.arch = normalizeArch(hv.architecture, hv.bitness); resolved.reliable = true; }
         return resolved;
       }).catch(function () { return resolved; });
     }
