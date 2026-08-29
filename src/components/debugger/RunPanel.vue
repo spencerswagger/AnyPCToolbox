@@ -6,6 +6,7 @@ import { parseResponse } from '@/lib/debugger/parse'
 import type { ParseResult } from '@/lib/debugger/parse'
 import { getGlobals, pushHistory } from '@/lib/debugger/db'
 import { computed, onMounted, ref, watch } from 'vue'
+import ResponseTable from './ResponseTable.vue'
 
 const props = defineProps<{ api: ApiRequest }>()
 const emit = defineEmits<{ (e: 'update', api: ApiRequest): void }>()
@@ -18,6 +19,8 @@ const err = ref('')
 const view = ref<'raw' | 'table'>('raw')
 const timeoutMs = 30000
 const literalVar = '{{var}}'
+const pageSize = 10
+const page = ref(1)
 
 onMounted(async () => { globals.value = await getGlobals() })
 
@@ -37,6 +40,18 @@ function setVar(i: number, value: string) {
   emit('update', { ...props.api, variables: vs })
 }
 
+// 分页：始终用 page 覆盖模板里的 {{page}}（若有），重发拿到目标页
+function effResolved(): Record<string, string> {
+  const r = { ...resolved.value }
+  if (props.api.variables.some((v) => v.name === 'page')) r.page = String(page.value)
+  return r
+}
+
+function goToPage(p: number) {
+  page.value = p
+  void send()
+}
+
 async function send() {
   running.value = true
   err.value = ''
@@ -44,7 +59,7 @@ async function send() {
   parsed.value = null
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    const built = buildRequest(props.api, resolved.value)
+    const built = buildRequest(props.api, effResolved())
     const ctl = new AbortController()
     timer = setTimeout(() => ctl.abort(), timeoutMs)
     const t0 = performance.now()
@@ -57,6 +72,7 @@ async function send() {
     void pushHistory(props.api.id, entry)
     result.value = { ok: resp.ok, status: resp.status, ms, size, raw }
     parsed.value = parseResponse(raw, props.api.parse)
+    page.value = parsed.value?.page ?? 1
   } catch (e) {
     if (timer) clearTimeout(timer)
     err.value = '发送失败：' + ((e as Error).name === 'AbortError' ? '请求超时' : '多为 CORS 跨域限制或网络不可达')
@@ -80,7 +96,14 @@ async function send() {
         </label>
       </div>
       <p v-else class="text-sm text-muted-foreground">模板中没有 {{ literalVar }} 占位符，可直接发送。</p>
-      <div class="mt-3"><button class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60" :disabled="running" @click="send">{{ running ? '发送中…' : '发送' }}</button></div>
+      <div class="mt-3 flex items-center gap-3">
+        <button class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60" :disabled="running" @click="send">{{ running ? '发送中…' : '发送' }}</button>
+        <label v-if="props.api.variables.some((v) => v.name === 'page')" class="flex items-center gap-1.5 text-sm text-muted-foreground">
+          当前页
+          <input type="number" min="1" class="w-16 rounded-md border border-border bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :value="page" @change="goToPage(Number(($event.target as HTMLInputElement).value) || 1)" />
+        </label>
+      </div>
     </div>
 
     <div v-if="err" class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">⚠️ {{ err }}</div>
@@ -99,7 +122,7 @@ async function send() {
       <div v-else-if="parsed && !parsed.ok" class="p-3 text-sm text-muted-foreground">
         {{ parsed.error }}<span v-if="parsed.topKeys?.length">；顶层键：{{ parsed.topKeys.join(', ') }}</span>
       </div>
-      <!-- 表格视图在 Task 10 接入 -->
+      <ResponseTable v-else-if="parsed && parsed.rows.length" :rows="parsed.rows" :total="parsed.total" :page="page" :page-size="pageSize" :columns="props.api.parse.columns" :loading="running" @go="goToPage" />
     </div>
   </div>
 </template>
