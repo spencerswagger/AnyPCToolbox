@@ -5,6 +5,7 @@ export type ColumnType = 'text' | 'number' | 'bool' | 'enum' | 'image' | 'dateti
 export interface KvItem {
   key: string
   value: string
+  enabled?: boolean // 勾选后才参与请求；默认 true
 }
 
 export interface VariableDef {
@@ -47,7 +48,8 @@ export interface ApiRequest {
   query: KvItem[]
   headers: KvItem[]
   bodyType: BodyType
-  bodyText: string // 可含 {{var}}
+  bodyText: string // 可含 {{var}}；json / text 时作为请求体原文
+  form: KvItem[] // form 类型时的表单条目（key=value）
   variables: VariableDef[]
   parse: ParseConfig
   paging: PagingConfig
@@ -67,6 +69,7 @@ export function createApiRequest(partial: Partial<ApiRequest> = {}): ApiRequest 
     headers: partial.headers ?? [],
     bodyType: partial.bodyType ?? 'none',
     bodyText: partial.bodyText ?? '',
+    form: partial.form ?? [],
     variables: partial.variables ?? [],
     parse: { listPath: '', columns: [], ...partial.parse },
     paging: { enabled: false, mode: 'page', pageParam: 'page', sizeParam: 'pageSize', offsetParam: 'offset', size: 10, ...partial.paging },

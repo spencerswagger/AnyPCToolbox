@@ -12,7 +12,7 @@ export function buildRequest(api: ApiRequest, resolved: Record<string, string>, 
   let url = replaceAll(api.urlTemplate, resolved)
   const qmap = new Map<string, string>()
   for (const q of api.query) {
-    if (q.key.trim() === '') continue
+    if (q.enabled === false || q.key.trim() === '') continue
     qmap.set(q.key, encodeURIComponent(replaceAll(q.value, resolved)))
   }
   // 分页等运行时注入的参数：存在同名则覆盖，避免重复
@@ -20,7 +20,7 @@ export function buildRequest(api: ApiRequest, resolved: Record<string, string>, 
   const query = [...qmap].map(([k, v]) => `${encodeURIComponent(k)}=${v}`)
   if (query.length) url += (url.includes('?') ? '&' : '?') + query.join('&')
 
-  const headers = api.headers.filter((h) => h.key.trim() !== '').map((h): [string, string] => [h.key, replaceAll(h.value, resolved)])
+  const headers = api.headers.filter((h) => h.enabled !== false && h.key.trim() !== '').map((h): [string, string] => [h.key, replaceAll(h.value, resolved)])
   const hasContentType = headers.some(([k]) => k.toLowerCase() === 'content-type')
 
   let body: string | undefined
@@ -30,8 +30,13 @@ export function buildRequest(api: ApiRequest, resolved: Record<string, string>, 
       headers.push(['Content-Type', 'application/json'])
     }
   } else if (api.bodyType === 'form') {
-    body = replaceAll(api.bodyText, resolved)
-    if ((body ?? '').trim() !== '' && !hasContentType) headers.push(['Content-Type', 'application/x-www-form-urlencoded'])
+    // 表单由条目化配置拼装为 application/x-www-form-urlencoded
+    const pairs = api.form.filter((f) => f.enabled !== false && f.key.trim() !== '')
+      .map((f) => `${encodeURIComponent(replaceAll(f.key, resolved))}=${encodeURIComponent(replaceAll(f.value, resolved))}`)
+    if (pairs.length) {
+      body = pairs.join('&')
+      if (!hasContentType) headers.push(['Content-Type', 'application/x-www-form-urlencoded'])
+    }
   }
 
   return { method: api.method, url, headers, body: body || undefined }

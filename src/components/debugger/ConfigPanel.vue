@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ApiRequest, ColumnDef, ColumnType, HttpMethod, ParseConfig, PagingConfig } from '@/lib/debugger/model'
+import type { ApiRequest, ColumnDef, ColumnType, HttpMethod, KvItem, ParseConfig, PagingConfig } from '@/lib/debugger/model'
 import { PAGING_PRESETS, presetToConfig, type PagingPreset } from '@/lib/debugger/paging'
 import FieldTip from './FieldTip.vue'
 import KvRows from './KvRows.vue'
@@ -59,6 +59,19 @@ function removeCol(i: number) {
 }
 function addCol() {
   setCols([...props.api.parse.columns, { field: '', title: '', type: 'text' }])
+}
+
+// ---- 从 URL 导入查询参数：拆出 ? 之后的部分加入 query，并从 URL 移除 ----
+function importFromUrl() {
+  const raw = props.api.urlTemplate
+  const qi = raw.indexOf('?')
+  if (qi < 0) return
+  const path = raw.slice(0, qi)
+  const qs = raw.slice(qi + 1)
+  const kv: KvItem[] = []
+  new URLSearchParams(qs).forEach((v, k) => kv.push({ key: k, value: v, enabled: true }))
+  if (!kv.length) return
+  patch({ urlTemplate: path || '', query: [...props.api.query, ...kv] })
 }
 
 // ---- 分页配置 ----
@@ -121,6 +134,7 @@ function mCls(m: HttpMethod): string {
           <div class="flex items-center gap-1.5 px-3 py-2">
             <span class="httpd-eyebrow text-foreground">查询参数</span>
             <FieldTip>请求问号之后拼接的参数。若开启分页，翻页时 key 与「分页参数名」相同的项会被自动覆盖。</FieldTip>
+            <button class="ml-auto httpd-btn rounded border border-border px-2 py-0.5 text-xs text-primary hover:bg-accent" title="把 URL 中问号之后的参数拆出来，添加到下方查询列表，并自动从 URL 中移除" @click="importFromUrl">从 URL 导入</button>
           </div>
           <div class="border-t border-border p-3">
             <KvRows :rows="api.query" @update="patch({ query: $event })" />
@@ -140,14 +154,20 @@ function mCls(m: HttpMethod): string {
         <div class="httpd-panel overflow-hidden">
           <div class="flex items-center gap-1.5 px-3 py-2">
             <span class="httpd-eyebrow text-foreground">请求体</span>
-            <FieldTip>选择内容类型（json / form / text）并填写内容，其中的 &#123;&#123;var}} 占位符会被提取为变量。json / form 会自动设置对应的 Content-Type。</FieldTip>
+            <FieldTip>选择内容类型：json（多行文本，自动带 Content-Type: application/json）／form（条目化 key=value，自动拼装为表单并带 x-www-form-urlencoded）／text（多行纯文本）。其中的 &#123;&#123;var}} 占位符会被提取为变量。</FieldTip>
           </div>
           <div class="space-y-2 border-t border-border p-3">
             <div class="flex flex-wrap gap-1">
               <button v-for="bt in bodyTypes" :key="bt" @click="patch({ bodyType: bt })"
                 class="httpd-chip" :class="api.bodyType === bt ? 'httpd-chip-bg text-foreground' : 'text-muted-foreground'">{{ bt }}</button>
             </div>
+            <!-- form 类型：条目化 key=value 配置 -->
+            <div v-if="api.bodyType === 'form'">
+              <KvRows :rows="api.form" @update="patch({ form: $event })" />
+            </div>
+            <!-- json / text：多行文本 -->
             <textarea
+              v-else
               class="h-40 w-full rounded border border-border bg-background p-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               placeholder="请求体内容（{{var}} 会被提取）"
               :value="api.bodyText"

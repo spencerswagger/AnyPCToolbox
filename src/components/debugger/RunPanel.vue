@@ -201,14 +201,8 @@ function sCls(status?: number): string {
             {{ new Date(e.ts).toLocaleString() }} · {{ e.status ?? 'ERR' }}
           </option>
         </select>
-        <span class="ml-auto flex items-center gap-2">
-          <button class="httpd-btn httpd-btn-accent rounded px-4 py-1.5 text-xs" :disabled="running" :title="'发送请求并记录到历史（' + effPaging?.pageParam + '/' + effPaging?.sizeParam + '）'" @click="send">
-            <span class="httpd-led" :class="running ? 'httpd-led-run bg-current' : ''" />
-            {{ running ? '发送中…' : '发送' }}
-          </button>
-        </span>
       </div>
-      <div class="p-3">
+      <div class="space-y-2 p-3">
         <div v-if="vars.length" class="grid gap-2 md:grid-cols-2">
           <label v-for="(v, i) in vars" :key="v.name" class="flex flex-col gap-1">
             <span class="text-xs font-semibold text-muted-foreground">{{ v.name }}</span>
@@ -217,7 +211,13 @@ function sCls(status?: number): string {
               @input="setVar(i, ($event.target as HTMLInputElement).value)" />
           </label>
         </div>
-        <p v-else class="text-xs text-muted-foreground">模板中没有 {{ literalVar }} 占位符，可直接发送。</p>
+        <div class="flex items-center gap-2 pt-0.5">
+          <button class="httpd-btn httpd-btn-accent flex-1 justify-center rounded-md px-4 py-2 text-xs font-semibold" :disabled="running" :title="'按当前接口发送请求并记录到历史；若配置了分页，将携带分页参数（' + (effPaging ? effPaging.mode === 'offset' ? effPaging.sizeParam + '/' + effPaging.offsetParam : effPaging.pageParam + '/' + effPaging.sizeParam : '未配置分页') + '）'" @click="send">
+            <span class="httpd-led" :class="running ? 'httpd-led-run bg-current' : ''" />
+            {{ running ? '发送中…' : '🚀 发送请求' }}
+          </button>
+        </div>
+        <p v-if="!vars.length" class="text-xs text-muted-foreground">模板中没有 {{ literalVar }} 占位符，可直接点击上方「🚀 发送请求」。</p>
       </div>
     </div>
 
