@@ -15,6 +15,7 @@ const globals = ref<Record<string, string>>({})
 const showEnv = ref(false)
 const renamingId = ref('')
 const renameText = ref('')
+const collapsed = ref(false)
 
 const currentApi = computed<ApiRequest | undefined>(() => apis.value[currentId.value])
 
@@ -89,9 +90,12 @@ function fmtTime(ts: number | undefined): string {
 <template>
   <div class="flex h-full flex-col">
     <div class="flex min-h-0 flex-1">
-      <aside class="w-60 shrink-0 overflow-y-auto border-r border-border bg-card p-3">
+      <aside v-if="!collapsed" class="w-60 shrink-0 overflow-y-auto border-r border-border bg-card p-3">
         <div class="mb-2 flex items-center justify-between">
-          <span class="text-xs uppercase tracking-wider text-muted-foreground">接口列表</span>
+          <span class="flex items-center gap-1">
+            <button class="text-muted-foreground hover:text-accent-foreground" title="折叠接口列表" @click="collapsed = true">◂</button>
+            <span class="text-xs uppercase tracking-wider text-muted-foreground">接口列表</span>
+          </span>
           <button class="text-sm text-primary hover:underline" @click="createApi">+ 新建</button>
         </div>
         <ul class="space-y-1">
@@ -110,6 +114,7 @@ function fmtTime(ts: number | undefined): string {
           </li>
         </ul>
       </aside>
+      <button v-else class="w-9 shrink-0 border-r border-border bg-card text-center text-muted-foreground hover:text-accent-foreground" title="展开接口列表" @click="collapsed = false">▸</button>
       <main class="min-w-0 flex-1 overflow-auto p-4">
         <div class="mb-4 flex items-center gap-1 border-b border-border">
           <button v-for="t in (['config','run','history'] as const)" :key="t" class="px-3 py-2 text-sm"

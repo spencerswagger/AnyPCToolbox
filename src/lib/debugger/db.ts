@@ -51,10 +51,12 @@ export async function saveApis(map: Record<string, ApiRequest>): Promise<void> {
 // ---- 请求历史：key = http:history:<apiId>，数组，最新在前，截断 HISTORY_CAP ----
 export interface HistoryEntry {
   ts: number
-  status: number
+  status?: number
   ms: number
-  size: number
-  raw: string
+  size?: number
+  raw?: string
+  error?: string
+  console: string
 }
 export async function getHistory(apiId: string): Promise<HistoryEntry[]> {
   return (await get<HistoryEntry[]>(`${HISTORY_PREFIX}${apiId}`)) ?? []

@@ -4,7 +4,7 @@ import { buildRequest } from '@/lib/debugger/builder'
 import { collectSnippet, extractPlaceholders, resolveVars } from '@/lib/debugger/variables'
 import { parseResponse } from '@/lib/debugger/parse'
 import type { ParseResult } from '@/lib/debugger/parse'
-import { pushHistory } from '@/lib/debugger/db'
+import { pushHistory, type HistoryEntry } from '@/lib/debugger/db'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import ResponseTable from './ResponseTable.vue'
 
@@ -57,31 +57,63 @@ function goToPage(p: number) {
   void send()
 }
 
+const STATUS_REASON: Record<number, string> = {
+  200: 'OK', 201: 'Created', 202: 'Accepted', 204: 'No Content', 206: 'Partial Content',
+  301: 'Moved Permanently', 302: 'Found', 304: 'Not Modified', 307: 'Temporary Redirect', 308: 'Permanent Redirect',
+  400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 405: 'Method Not Allowed', 409: 'Conflict',
+  418: "I'm a Teapot", 422: 'Unprocessable Entity', 429: 'Too Many Requests',
+  500: 'Internal Server Error', 501: 'Not Implemented', 502: 'Bad Gateway', 503: 'Service Unavailable', 504: 'Gateway Timeout', 505: 'HTTP Version Not Supported',
+}
+
 async function send() {
   running.value = true
   err.value = ''
   result.value = null
   parsed.value = null
+  const log: string[] = []
+  const t0 = performance.now()
   let timer: ReturnType<typeof setTimeout> | undefined
+  const built = buildRequest(props.api, effResolved())
+  log.push(`* Preparing request to \`${built.url}\``)
+  log.push(`* Current time is ${new Date().toISOString()}`)
+  log.push('* Enable automatic URL encoding')
+  log.push('* Using default HTTP version')
+  log.push(`* Enable timeout of ${timeoutMs}ms`)
   try {
-    const built = buildRequest(props.api, effResolved())
+    let target: URL
+    try { target = new URL(built.url) } catch { target = new URL('https://invalid.invalid/') }
+    log.push('', `> ${built.method} ${target.pathname + target.search} HTTP/1.1`)
+    log.push(`> Host: ${target.host}`)
+    for (const [k, v] of built.headers) log.push(`> ${k}: ${v}`)
+    if (built.body !== undefined) log.push(`> Content-Length: ${new Blob([built.body]).size}`)
+    log.push('> Accept: */*')
+    log.push('')
     const ctl = new AbortController()
     aborter = ctl
     timer = setTimeout(() => ctl.abort(), timeoutMs)
-    const t0 = performance.now()
     const resp = await fetch(built.url, built.body !== undefined ? { method: built.method, headers: built.headers, body: built.body, signal: ctl.signal } : { method: built.method, headers: built.headers, signal: ctl.signal })
     const ms = Math.round(performance.now() - t0)
-    const raw = await resp.text()
     clearTimeout(timer)
+    const raw = await resp.text()
     const size = new Blob([raw]).size
-    const entry = { ts: Date.now(), status: resp.status, ms, size, raw }
+    log.push('', `< HTTP/1.1 ${resp.status}${STATUS_REASON[resp.status] ? ' ' + STATUS_REASON[resp.status] : ''}`)
+    log.push('* Connected via browser fetch（TLS / DNS 细节不对页面暴露）')
+    log.push(`* Received ${size} B`)
+    log.push('* Connection closed')
+    const entry: HistoryEntry = { ts: Date.now(), status: resp.status, ms, size, raw, console: log.join('\n') }
     void pushHistory(props.api.id, entry)
     result.value = { ok: resp.ok, status: resp.status, ms, size, raw }
     parsed.value = parseResponse(raw, props.api.parse)
     if (parsed.value?.page !== undefined) page.value = parsed.value.page
   } catch (e) {
+    const ms = Math.round(performance.now() - t0)
     if (timer) clearTimeout(timer)
-    err.value = '发送失败：' + ((e as Error).name === 'AbortError' ? '请求超时' : '多为 CORS 跨域限制或网络不可达')
+    const aborted = (e as Error).name === 'AbortError'
+    const msg = aborted ? '请求超时' : '请求失败（多为 CORS 跨域限制或网络不可达）'
+    log.push('', aborted ? `* Operation timed out after ${ms}ms` : `* Error: ${msg}`)
+    const entry: HistoryEntry = { ts: Date.now(), status: undefined, ms, error: msg, console: log.join('\n') }
+    void pushHistory(props.api.id, entry)
+    err.value = '发送失败：' + msg
   } finally {
     running.value = false
   }
