@@ -14,7 +14,8 @@ export interface ParseResult {
 
 function pick(path: string, json: unknown): unknown {
   if (!path || path.trim() === '') return undefined
-  const arr = JSONPath({ path: path.trim(), json }) as unknown[]
+  // jsonpath-plus 类型声明的 json 参数仅接受可 JSON 序列化值；JSON.parse 结果在此已收窄为实际 JSON 结构
+  const arr = JSONPath({ path: path.trim(), json: json as any }) as unknown[]
   return arr && arr.length ? arr[0] : undefined
 }
 
