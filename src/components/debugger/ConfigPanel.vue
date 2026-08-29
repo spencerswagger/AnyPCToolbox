@@ -4,8 +4,12 @@ import FieldTip from './FieldTip.vue'
 import KvRows from './KvRows.vue'
 import { TooltipProvider } from 'radix-vue'
 
-const props = defineProps<{ api: ApiRequest }>()
-const emit = defineEmits<{ (e: 'update', api: ApiRequest): void }>()
+const props = defineProps<{ api: ApiRequest; dirty: boolean }>()
+const emit = defineEmits<{
+  (e: 'update', api: ApiRequest): void
+  (e: 'save'): void
+  (e: 'send'): void
+}>()
 
 const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const
 const bodyTypes = ['none', 'json', 'form', 'text'] as const
@@ -56,6 +60,15 @@ function mCls(m: HttpMethod): string {
           :value="api.urlTemplate"
           @input="patch({ urlTemplate: ($event.target as HTMLInputElement).value })"
         />
+        <span v-if="dirty" class="shrink-0 font-mono text-[10px] font-bold text-warning" title="当前接口有未保存的修改：点右侧「保存」写入本地">● 未保存</span>
+        <button
+          class="shrink-0 rounded border border-border px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+          :disabled="!dirty" :title="'把当前接口的请求配置、解析与分页规则保存到本地'" @click="emit('save')"
+        >保存</button>
+        <button
+          class="shrink-0 rounded border border-primary px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary hover:text-primary-foreground"
+          :title="'按当前接口发送请求并记录到历史（自动跳到「调试」页查看结果）'" @click="emit('send')"
+        >🚀 发送</button>
       </div>
 
       <div class="httpd-panel overflow-hidden">

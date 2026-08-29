@@ -9,7 +9,7 @@ import { pushHistory, type HistoryEntry } from '@/lib/debugger/db'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import ResponseView from './ResponseView.vue'
 
-const props = defineProps<{ api: ApiRequest; globals: Record<string, string> }>()
+const props = defineProps<{ api: ApiRequest; globals: Record<string, string>; sendTick?: number }>()
 const emit = defineEmits<{
   (e: 'update', api: ApiRequest): void
   (e: 'sent'): void // 发送完成后通知父级刷新左侧历史记录
@@ -30,6 +30,15 @@ const effPaging = computed(() => effectivePaging(props.api))
 // 模块/组件作用域的当前 AbortController：卸载时中止未完成的 fetch
 let aborter: AbortController | null = null
 onUnmounted(() => aborter?.abort())
+
+// 外部「发送」信号（来自「请求」页 URL 右侧）：信号递增即触发一次发送
+const lastSendTick = ref(props.sendTick ?? 0)
+watch(() => props.sendTick, (v) => {
+  if (v !== undefined && v !== lastSendTick.value) {
+    lastSendTick.value = v
+    if (!running.value) void send()
+  }
+})
 
 // 从模板自动提取占位符并合并到变量（不覆盖已有默认值/描述）
 const varNames = computed(() => extractPlaceholders([collectSnippet(props.api)]))
