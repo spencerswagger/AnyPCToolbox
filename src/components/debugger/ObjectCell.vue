@@ -8,9 +8,9 @@ const props = defineProps<{
   value: unknown
   basePath: string // 该字段值在完整响应中的绝对 JSONPath
   title: string
-  pickable: boolean
+  // 当在「弹框内下钻」语境（如弹框里的列表）时传入：点「查看」直接在弹框内展开该值，而非再弹一层
+  drill?: (value: unknown, field: string) => void
 }>()
-const emit = defineEmits<{ (e: 'pick', path: string): void }>()
 const modalOpen = ref(false)
 
 const arr = Array.isArray(props.value)
@@ -24,7 +24,7 @@ const badge = arr ? `array[${props.value.length}]` : 'object'
         <button
           class="rounded border border-border px-2 py-0.5 text-xs font-medium text-primary hover:bg-accent"
           :title="title"
-          @click="modalOpen = true"
+          @click="props.drill ? props.drill(props.value, props.title) : (modalOpen = true)"
         >查看</button>
       </TooltipTrigger>
       <TooltipPortal>
@@ -46,9 +46,7 @@ const badge = arr ? `array[${props.value.length}]` : 'object'
       :value="value"
       :title="title"
       :base-path="basePath"
-      :pickable="pickable"
       @close="modalOpen = false"
-      @pick="(p) => emit('pick', p)"
     />
   </span>
 </template>

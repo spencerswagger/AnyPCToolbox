@@ -4,8 +4,8 @@ import { toCellView } from '@/lib/debugger/renderers'
 import { computed, ref } from 'vue'
 import ObjectCell from './ObjectCell.vue'
 
-const props = withDefaults(defineProps<{ rows: unknown[]; total?: number; page?: number; pageSize: number; columns: ColumnDef[]; loading?: boolean; listPath?: string }>(), { listPath: '' })
-const emit = defineEmits<{ (e: 'go', page: number): void; (e: 'pick', path: string): void }>()
+const props = withDefaults(defineProps<{ rows: unknown[]; total?: number; page?: number; pageSize: number; columns: ColumnDef[]; loading?: boolean; listPath?: string; drillCell?: (value: unknown, field: string) => void }>(), { listPath: '' })
+const emit = defineEmits<{ (e: 'go', page: number): void }>()
 const previewUrl = ref('')
 
 const pageCount = computed(() => props.total !== undefined ? Math.max(1, Math.ceil(props.total / props.pageSize)) : Math.max(1, Math.ceil(props.rows.length / Math.max(1, props.pageSize))))
@@ -27,9 +27,6 @@ function cellPath(rowIndex: number, field: string): string {
   let base = lp.startsWith('$') ? lp.slice(1).replace(/^\./, '') : lp
   return `$${base ? '.' + base : ''}[${rowIndex}].${field}`
 }
-const pathEnabled = computed(() => !!(props.listPath || '').trim())
-// 「查看」单元格是否允许进一步「设为列表」下钻
-const pickable = computed(() => pathEnabled.value || !!(props.total || props.rows.length))
 function cellVal(r: unknown, field: string): unknown {
   return (r as Record<string, unknown>)[field]
 }
@@ -52,8 +49,7 @@ function cellVal(r: unknown, field: string): unknown {
               :value="cellVal(r, c.field)"
               :base-path="cellPath(i, c.field)"
               :title="c.field"
-              :pickable="pickable"
-              @pick="(p) => emit('pick', p)"
+              :drill="drillCell"
             />
             <img v-else-if="toCellView(cellVal(r, c.field), c).kind === 'image'"
               :src="toCellView(cellVal(r, c.field), c).text" class="h-10 w-10 cursor-zoom-in rounded object-cover" @click="previewUrl = toCellView(cellVal(r, c.field), c).text" />

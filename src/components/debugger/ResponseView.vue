@@ -34,7 +34,7 @@ const kind = computed<'table' | 'tree' | 'raw'>(() => {
   <ResponseTable
     v-if="kind === 'table' && parsed"
     :rows="parsed.rows" :total="total" :page="page ?? 1" :page-size="pageSize"
-    :columns="columns" :loading="loading" :list-path="parse.listPath" @go="() => {}" @pick="(p) => emit('pick', p)"
+    :columns="columns" :loading="loading" :list-path="parse.listPath" @go="() => {}"
   />
   <JsonTree
     v-else-if="kind === 'tree' && parsed?.json"

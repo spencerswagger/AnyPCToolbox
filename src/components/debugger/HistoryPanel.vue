@@ -102,7 +102,7 @@ const viewOpts = [
       <pre v-else class="whitespace-pre-wrap p-3 font-mono text-xs text-foreground">{{ entry.raw }}</pre>
     </div>
     <div v-else class="httpd-console max-h-[50vh] overflow-auto">
-      <ResponseTable v-if="canList && entry.raw" :rows="listRows()" :columns="columns" :page-size="Number.MAX_SAFE_INTEGER" :list-path="effParse.listPath" @pick="pickList" />
+      <ResponseTable v-if="canList && entry.raw" :rows="listRows()" :columns="columns" :page-size="Number.MAX_SAFE_INTEGER" :list-path="effParse.listPath" />
       <p v-else class="p-3 font-mono text-xs text-muted-foreground">{{ entry.error ?? '该响应未匹配到列表，请先在 JSON 视图里把鼠标移到某个数组上点「⇘ 设为列表」，或到「解析」页配置列表路径' }}</p>
     </div>
     </div>
