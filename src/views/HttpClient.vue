@@ -3,6 +3,7 @@ import { createApiRequest } from '@/lib/debugger/model'
 import type { ApiRequest } from '@/lib/debugger/model'
 import { getApis, saveApis } from '@/lib/debugger/db'
 import ConfigPanel from '@/components/debugger/ConfigPanel.vue'
+import RunPanel from '@/components/debugger/RunPanel.vue'
 import { onMounted, ref } from 'vue'
 
 const apis = ref<Record<string, ApiRequest>>({})
@@ -49,6 +50,7 @@ function select(id: string) { currentId.value = id }
       </div>
       <template v-if="apis[currentId]">
         <ConfigPanel v-if="activeTab === 'config'" :api="apis[currentId]" @update="save" />
+        <RunPanel v-else-if="activeTab === 'run'" :api="apis[currentId]" @update="save" />
         <p v-else class="text-sm text-muted-foreground">该 Tab 在后续任务实现。</p>
       </template>
     </main>
