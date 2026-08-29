@@ -51,7 +51,11 @@ function onImport(e: Event) {
   file.text().then((t) => { const api = importApi(t); if (api) emit('import', api) })
 }
 function doCopy() {
-  navigator.clipboard?.writeText(exportApi(props.api))
+  try {
+    navigator.clipboard?.writeText(exportApi(props.api))
+  } catch {
+    /* 静默 */
+  }
 }
 </script>
 

@@ -5,7 +5,7 @@ import { collectSnippet, extractPlaceholders, resolveVars } from '@/lib/debugger
 import { parseResponse } from '@/lib/debugger/parse'
 import type { ParseResult } from '@/lib/debugger/parse'
 import { pushHistory } from '@/lib/debugger/db'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import ResponseTable from './ResponseTable.vue'
 
 const props = defineProps<{ api: ApiRequest; globals: Record<string, string> }>()
@@ -22,12 +22,19 @@ const literalVar = '{{var}}'
 const pageSize = 10
 const page = ref(1)
 
+// 模块/组件作用域的当前 AbortController：卸载时中止未完成的 fetch
+let aborter: AbortController | null = null
+onUnmounted(() => aborter?.abort())
+
 // 从模板自动提取占位符并合并到变量（不覆盖已有默认值/描述）
+// 内容守卫：仅当合并结果与当前 variables 确有差异时才 emit，避免与父级 save 形成往复更新
 const varNames = computed(() => extractPlaceholders([collectSnippet(props.api)]))
 watch(varNames, (names) => {
   const existing = new Map(props.api.variables.map((v) => [v.name, v]))
   const merged = names.map((n) => existing.get(n) ?? { name: n, value: '' })
-  emit('update', { ...props.api, variables: merged })
+  const changed = merged.length !== props.api.variables.length
+    || merged.some((m, i) => m.name !== props.api.variables[i]?.name)
+  if (changed) emit('update', { ...props.api, variables: merged })
 }, { immediate: true })
 
 const vars = computed(() => props.api.variables.map((v) => ({ name: v.name, value: v.value })))
@@ -59,6 +66,7 @@ async function send() {
   try {
     const built = buildRequest(props.api, effResolved())
     const ctl = new AbortController()
+    aborter = ctl
     timer = setTimeout(() => ctl.abort(), timeoutMs)
     const t0 = performance.now()
     const resp = await fetch(built.url, built.body !== undefined ? { method: built.method, headers: built.headers, body: built.body, signal: ctl.signal } : { method: built.method, headers: built.headers, signal: ctl.signal })
@@ -70,7 +78,7 @@ async function send() {
     void pushHistory(props.api.id, entry)
     result.value = { ok: resp.ok, status: resp.status, ms, size, raw }
     parsed.value = parseResponse(raw, props.api.parse)
-    page.value = parsed.value?.page ?? 1
+    if (parsed.value?.page !== undefined) page.value = parsed.value.page
   } catch (e) {
     if (timer) clearTimeout(timer)
     err.value = '发送失败：' + ((e as Error).name === 'AbortError' ? '请求超时' : '多为 CORS 跨域限制或网络不可达')
@@ -99,7 +107,7 @@ async function send() {
         <label v-if="props.api.variables.some((v) => v.name === 'page')" class="flex items-center gap-1.5 text-sm text-muted-foreground">
           当前页
           <input type="number" min="1" class="w-16 rounded-md border border-border bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            :value="page" @change="goToPage(Number(($event.target as HTMLInputElement).value) || 1)" />
+            :value="page" :disabled="running" @change="goToPage(Number(($event.target as HTMLInputElement).value) || 1)" />
         </label>
       </div>
     </div>

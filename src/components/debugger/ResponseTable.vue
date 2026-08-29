@@ -39,8 +39,8 @@ const cols = computed(() => {
     <p v-if="!rows.length" class="p-4 text-center text-sm text-muted-foreground">{{ loading ? '加载中…' : '无数据' }}</p>
     <div v-if="pageCount > 1" class="flex items-center justify-end gap-2 border-t border-border px-3 py-2 text-sm">
       <span class="text-muted-foreground">第 {{ page }} / {{ pageCount }} 页 · 共 {{ total ?? rows.length }} 条</span>
-      <button class="rounded-md border border-input bg-background px-2 py-1 hover:bg-accent disabled:opacity-50" :disabled="!page || page <= 1" @click="emit('go', (page ?? 1) - 1)">上一页</button>
-      <button class="rounded-md border border-input bg-background px-2 py-1 hover:bg-accent disabled:opacity-50" :disabled="pageCount <= (page ?? 1)" @click="emit('go', (page ?? 1) + 1)">下一页</button>
+      <button class="rounded-md border border-input bg-background px-2 py-1 hover:bg-accent disabled:opacity-50" :disabled="loading || !page || page <= 1" @click="emit('go', (page ?? 1) - 1)">上一页</button>
+      <button class="rounded-md border border-input bg-background px-2 py-1 hover:bg-accent disabled:opacity-50" :disabled="loading || pageCount <= (page ?? 1)" @click="emit('go', (page ?? 1) + 1)">下一页</button>
     </div>
   </div>
   <!-- 图片预览 -->
