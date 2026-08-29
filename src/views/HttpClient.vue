@@ -1,23 +1,29 @@
 <script setup lang="ts">
 import { createApiRequest } from '@/lib/debugger/model'
 import type { ApiRequest } from '@/lib/debugger/model'
-import { getApis, saveApis, getGlobals, saveGlobals } from '@/lib/debugger/db'
+import { getApis, saveApis, getGlobals, saveGlobals, getHistory, type HistoryEntry } from '@/lib/debugger/db'
 import ConfigPanel from '@/components/debugger/ConfigPanel.vue'
 import RunPanel from '@/components/debugger/RunPanel.vue'
 import HistoryPanel from '@/components/debugger/HistoryPanel.vue'
 import EnvPanel from '@/components/debugger/EnvPanel.vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 const apis = ref<Record<string, ApiRequest>>({})
 const currentId = ref<string>('')
-const activeTab = ref<'config' | 'run' | 'history'>('config')
+const activeTab = ref<'config' | 'run'>('config')
 const globals = ref<Record<string, string>>({})
 const showEnv = ref(false)
 const renamingId = ref('')
 const renameText = ref('')
 const collapsed = ref(false)
+// 显式保存：记录哪些接口有未保存修改
+const dirtyMap = ref<Record<string, boolean>>({})
+// 左侧历史记录 + 当前选中的历史条目（供 配置→解析 / 运行 共用）
+const history = ref<HistoryEntry[]>([])
+const pickedHistory = ref<HistoryEntry | null>(null)
 
 const currentApi = computed<ApiRequest | undefined>(() => apis.value[currentId.value])
+const dirty = computed(() => !!dirtyMap.value[currentId.value])
 
 onMounted(async () => {
   apis.value = await getApis()
@@ -32,11 +38,33 @@ onMounted(async () => {
   }
 })
 
-function save(api: ApiRequest) {
-  apis.value = { ...apis.value, [api.id]: api }
-  void saveApis(apis.value)
+// 切换当前接口：重置历史选中并加载该接口的历史
+watch(currentId, async (id) => {
+  pickedHistory.value = null
+  dirtyMap.value = { ...dirtyMap.value, [id]: false }
+  if (id) history.value = await getHistory(id)
+})
+async function loadHistory() {
+  if (currentId.value) history.value = await getHistory(currentId.value)
 }
-function select(id: string) { currentId.value = id }
+
+// 编辑只更新内存，由「保存」按钮主动持久化
+function update(api: ApiRequest) {
+  apis.value = { ...apis.value, [api.id]: api }
+  dirtyMap.value = { ...dirtyMap.value, [api.id]: true }
+}
+function persistCurrent() {
+  const a = currentApi.value
+  if (!a) return
+  const up = { ...a, updatedAt: Date.now() }
+  apis.value = { ...apis.value, [a.id]: up }
+  void saveApis(apis.value)
+  dirtyMap.value = { ...dirtyMap.value, [a.id]: false }
+}
+function select(id: string) {
+  currentId.value = id
+  showEnv.value = false
+}
 function setGlobals(g: Record<string, string>) { globals.value = g; void saveGlobals(g) }
 function onImport(api: ApiRequest) {
   apis.value = { ...apis.value, [api.id]: api }
@@ -61,7 +89,7 @@ function commitRename() {
   renamingId.value = ''
   if (id && apis.value[id]) {
     const name = renameText.value.trim()
-    if (name && name !== apis.value[id].name) save({ ...apis.value[id], name })
+    if (name && name !== apis.value[id].name) update({ ...apis.value[id], name })
     else if (!name) { const n = apis.value[id].name; if (n) renameText.value = n }
   }
 }
@@ -79,6 +107,18 @@ function removeApi(id: string) {
     }
   }
   void saveApis(apis.value)
+}
+
+// ---- 历史：选中后在「运行」页查看控制台 / 响应，也供「解析」页推断 ----
+function pickHistory(e: HistoryEntry) {
+  pickedHistory.value = e
+  activeTab.value = 'run'
+}
+function onSent() { void loadHistory() }
+function goRun() { activeTab.value = 'run' }
+function sCls(status?: number): string {
+  if (!status || status < 100 || status >= 600) return 'httpd-ser'
+  return `httpd-s${Math.floor(status / 100)}`
 }
 
 // ---- 底部状态栏 ----
@@ -99,7 +139,6 @@ function mCls(m?: string): string {
 const tabs = [
   { key: 'config', label: '配置' },
   { key: 'run', label: '运行·可视化' },
-  { key: 'history', label: '历史' },
 ] as const
 </script>
 
@@ -114,13 +153,20 @@ const tabs = [
       <span v-if="currentApi" class="httpd-chip ml-1" :class="mCls(currentApi.method)">{{ currentApi.method }}</span>
       <span class="min-w-0 truncate font-medium text-foreground">{{ currentApi?.name ?? '—' }}</span>
       <span v-if="currentApi" class="truncate font-mono text-xs text-muted-foreground">{{ currentApi.urlTemplate }}</span>
+      <span v-if="dirty" class="ml-auto shrink-0 font-mono text-[10px] text-warning">● 未保存</span>
+      <button
+        v-if="currentApi"
+        class="ml-auto shrink-0 rounded border border-border px-3 py-1 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-40"
+        :disabled="!dirty" :title="'保存当前接口的配置与解析规则到本地（含分页配置）'" @click="persistCurrent"
+      >保存</button>
     </header>
 
     <div class="flex min-h-0 flex-1">
-      <aside v-if="!collapsed" class="w-60 shrink-0 overflow-y-auto border-r border-border bg-card">
+      <aside v-if="!collapsed" class="w-64 shrink-0 overflow-y-auto border-r border-border bg-card">
+        <!-- 接口列表 -->
         <div class="flex items-center justify-between border-b border-border px-2 py-2">
           <span class="flex items-center gap-1.5 px-1">
-            <button class="text-xs text-muted-foreground hover:text-accent-foreground" title="把接口列表收起到最左侧，为主区域腾出空间" @click="collapsed = true">‹</button>
+            <button class="text-xs text-muted-foreground hover:text-accent-foreground" title="把左侧栏收起到最窄，为主区域腾出空间" @click="collapsed = true">‹</button>
             <span class="httpd-eyebrow text-muted-foreground">接口列表</span>
           </span>
           <button class="httpd-btn rounded border border-border px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground" title="新建一个空接口" @click="createApi">+ 新建</button>
@@ -138,16 +184,34 @@ const tabs = [
                 @click="select(a.id)" @dblclick="startRename(a.id)" :title="a.name">
                 <span class="w-12 shrink-0 font-mono font-semibold" :class="mCls(a.method)">{{ a.method }}</span>
                 <span class="min-w-0 truncate">{{ a.name }}</span>
+                <span v-if="dirtyMap[a.id]" class="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-warning" title="有未保存修改" />
               </button>
               <button class="shrink-0 text-muted-foreground opacity-0 hover:text-accent-foreground group-hover:opacity-100" title="重命名" @click="startRename(a.id)">✎</button>
               <button class="shrink-0 text-muted-foreground opacity-0 hover:text-destructive group-hover:opacity-100" title="删除" @click="removeApi(a.id)">✕</button>
             </template>
           </li>
         </ul>
+
+        <!-- 历史记录 -->
+        <div class="mt-2 border-t border-border px-2 py-2">
+          <span class="px-1 text-xs text-muted-foreground"><span class="httpd-eyebrow">历史记录</span><span v-if="history.length" class="ml-1 font-mono text-[10px]">（{{ history.length }}）</span></span>
+        </div>
+        <ul v-if="history.length" class="space-y-0.5 p-1.5">
+          <li v-for="e in history" :key="e.ts">
+            <button class="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-accent"
+              :class="pickedHistory === e ? 'bg-accent text-accent-foreground' : 'text-foreground'"
+              :title="'查看该请求的控制台与响应（在「运行」页），并在「配置→解析」中用它来推断解析规则'" @click="pickHistory(e)">
+              <span class="w-9 shrink-0 font-mono font-bold" :class="sCls(e.status)">{{ e.status ?? 'ERR' }}</span>
+              <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-muted-foreground">{{ new Date(e.ts).toLocaleTimeString() }}</span>
+              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{{ e.size !== undefined ? e.size + 'B' : e.ms + 'ms' }}</span>
+            </button>
+          </li>
+        </ul>
+        <p v-else class="px-3 py-2 font-mono text-[10px] text-muted-foreground">// 暂无记录，发送请求后出现</p>
       </aside>
-      <button v-else class="flex w-9 shrink-0 flex-col items-center justify-center gap-1 border-r border-border bg-card text-muted-foreground hover:text-accent-foreground" title="展开接口列表" @click="collapsed = false">
+      <button v-else class="flex w-9 shrink-0 flex-col items-center justify-center gap-1 border-r border-border bg-card text-muted-foreground hover:text-accent-foreground" title="展开左侧栏" @click="collapsed = false">
         <span class="font-mono text-lg leading-none">›</span>
-        <span class="httpd-eyebrow" style="writing-mode: vertical-rl">接口列表</span>
+        <span class="httpd-eyebrow" style="writing-mode: vertical-rl">接口 · 历史</span>
       </button>
 
       <main class="min-w-0 flex-1 overflow-auto p-4">
@@ -159,11 +223,16 @@ const tabs = [
             :title="'全局变量与接口导入：可设置默认的环境变量，或从 OpenAPI / curl 导入接口'"
             :class="showEnv ? 'text-primary' : 'text-muted-foreground'" @click="showEnv = !showEnv">环境变量 / 导入</button>
         </div>
+
         <EnvPanel v-if="showEnv && currentApi" :globals="globals" :api="currentApi" @globals="setGlobals" @import="onImport" />
         <template v-else-if="currentApi">
-          <ConfigPanel v-if="activeTab === 'config'" :api="currentApi" @update="save" />
-          <RunPanel v-else-if="activeTab === 'run'" :api="currentApi" :globals="globals" @update="save" />
-          <HistoryPanel v-else :api-id="currentId" />
+          <ConfigPanel v-if="activeTab === 'config'" :api="currentApi" :history="history" :picked="pickedHistory" @update="update" @go-run="goRun" />
+          <template v-else>
+            <RunPanel :api="currentApi" :globals="globals" @update="update" @sent="onSent" />
+            <div v-if="pickedHistory" class="mt-4">
+              <HistoryPanel :entry="pickedHistory" :parse="currentApi.parse" :columns="currentApi.parse.columns" />
+            </div>
+          </template>
         </template>
       </main>
     </div>

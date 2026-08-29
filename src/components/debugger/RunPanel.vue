@@ -2,34 +2,30 @@
 import type { ApiRequest } from '@/lib/debugger/model'
 import { buildRequest } from '@/lib/debugger/builder'
 import { collectSnippet, extractPlaceholders, resolveVars } from '@/lib/debugger/variables'
-import { parseResponse, inferParse } from '@/lib/debugger/parse'
+import { parseResponse } from '@/lib/debugger/parse'
 import type { ParseResult } from '@/lib/debugger/parse'
 import { effectivePaging, pagingParams } from '@/lib/debugger/paging'
-import { getHistory, pushHistory, type HistoryEntry } from '@/lib/debugger/db'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { TooltipProvider } from 'radix-vue'
-import ResponseTable from './ResponseTable.vue'
-import ResponseTree from './ResponseTree.vue'
-import FieldTip from './FieldTip.vue'
+import { pushHistory, type HistoryEntry } from '@/lib/debugger/db'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import ResponseView from './ResponseView.vue'
 
 const props = defineProps<{ api: ApiRequest; globals: Record<string, string> }>()
-const emit = defineEmits<{ (e: 'update', api: ApiRequest): void }>()
+const emit = defineEmits<{
+  (e: 'update', api: ApiRequest): void
+  (e: 'sent'): void // 发送完成后通知父级刷新左侧历史记录
+}>()
 
 const globals = computed(() => props.globals)
 const running = ref(false)
 const result = ref<{ ok: boolean; status?: number; ms?: number; size?: number; raw: string } | null>(null)
 const parsed = ref<ParseResult | null>(null)
 const err = ref('')
-const notice = ref('')
-const view = ref<'raw' | 'table' | 'tree'>('raw')
 const timeoutMs = 30000
 const literalVar = '{{var}}'
 const page = ref(1)
-const historyPick = ref<HistoryEntry | null>(null)
 
 // 分页（含旧数据兼容：模板含 page 变量视为分页开启）
 const effPaging = computed(() => effectivePaging(props.api))
-const pageSize = computed(() => effPaging.value?.size ?? Number.MAX_SAFE_INTEGER)
 
 // 模块/组件作用域的当前 AbortController：卸载时中止未完成的 fetch
 let aborter: AbortController | null = null
@@ -53,28 +49,6 @@ function setVar(i: number, value: string) {
   emit('update', { ...props.api, variables: vs })
 }
 
-// 历史响应用来查看：切换接口时重置
-const history = ref<HistoryEntry[]>([])
-async function loadHistory() { history.value = await getHistory(props.api.id) }
-watch(() => props.api.id, () => { void loadHistory(); page.value = 1; result.value = null; parsed.value = null; historyPick.value = null; err.value = ''; notice.value = '' })
-onMounted(loadHistory)
-function onHistorySel(ts: number) {
-  const e = history.value.find((h) => h.ts === ts)
-  if (!e) return
-  historyPick.value = e
-  running.value = false
-  if (e.raw) {
-    result.value = { ok: e.status ? e.status < 300 : false, status: e.status, ms: e.ms, raw: e.raw }
-    parsed.value = parseResponse(e.raw, props.api.parse)
-    if (parsed.value?.page !== undefined) page.value = parsed.value.page
-    view.value = 'raw'
-  } else {
-    result.value = null
-    parsed.value = null
-    err.value = e.error ?? '该历史记录无响应体'
-  }
-}
-
 // 当前发送所用变量（模板占位符 + 运行时变量），并注入分页参数
 function effResolved(): Record<string, string> {
   const r = { ...resolved.value }
@@ -91,7 +65,6 @@ async function send() {
   err.value = ''
   result.value = null
   parsed.value = null
-  historyPick.value = null
   const log: string[] = []
   const t0 = performance.now()
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -126,13 +99,10 @@ async function send() {
     log.push('* Connection closed')
     const entry: HistoryEntry = { ts: Date.now(), status: resp.status, ms, size, raw, console: log.join('\n') }
     void pushHistory(props.api.id, entry)
+    emit('sent')
     result.value = { ok: resp.ok, status: resp.status, ms, size, raw }
     parsed.value = parseResponse(raw, props.api.parse)
     if (parsed.value?.page !== undefined) page.value = parsed.value.page
-    // 尚未配置解析、但响应可识别为列表时，给出推断提示
-    if (parsed.value?.json && !props.api.parse.listPath) {
-      notice.value = '检测到可用 JSON，可在响应栏点击「✧ 自动推断」快速生成列表 / 总数 / 页码 / 字段列'
-    }
   } catch (e) {
     const ms = Math.round(performance.now() - t0)
     if (timer) clearTimeout(timer)
@@ -141,6 +111,7 @@ async function send() {
     log.push('', aborted ? `* Operation timed out after ${ms}ms` : `* Error: ${msg}`)
     const entry: HistoryEntry = { ts: Date.now(), status: undefined, ms, error: msg, console: log.join('\n') }
     void pushHistory(props.api.id, entry)
+    emit('sent')
     err.value = '发送失败：' + msg
   } finally {
     running.value = false
@@ -152,21 +123,6 @@ function goToPage(p: number) {
   if (next === page.value) return
   page.value = next
   void send()
-}
-
-// 根据常见 JSON 返回格式推断解析与分页配置
-function applyInfer() {
-  if (!parsed.value?.json) { notice.value = '当前没有可分析的 JSON 响应，请先发送请求或选择一条历史记录'; return }
-  const inf = inferParse(parsed.value.json)
-  if (!inf) { notice.value = '未找到可推断的数组列表，请手动在「配置 → 解析」中填写 JSONPath'; return }
-  const parsePatch = { listPath: inf.parse.listPath!, totalPath: inf.parse.totalPath, pagePath: inf.parse.pagePath, columns: inf.parse.columns }
-  emit('update', {
-    ...props.api,
-    parse: { ...props.api.parse, ...parsePatch },
-    paging: { ...props.api.paging, ...inf.paging, enabled: true },
-    updatedAt: Date.now(),
-  })
-  notice.value = '✧ 已自动推断：' + inf.summary
 }
 
 const STATUS_REASON: Record<number, string> = {
@@ -185,22 +141,14 @@ function sCls(status?: number): string {
 </script>
 
 <template>
-  <TooltipProvider :delay-duration="150"><div class="space-y-4">
-    <!-- 请求 / 历史 工具区 -->
+  <div class="space-y-4">
+    <!-- 发送区 -->
     <div class="httpd-panel">
       <div class="httpd-panel-title">
-        <span class="httpd-eyebrow text-muted-foreground">请求 / 历史</span>
-        <FieldTip>顶部「发送」会按当前接口实时请求；此下拉可选择一条历史请求，在下方面板查看其响应。选择「最新发送（实时）」回到实时请求模式。</FieldTip>
-        <select
-          class="ml-1 h-7 max-w-60 rounded border border-border bg-background px-1.5 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :value="historyPick?.ts ?? 0"
-          @change="onHistorySel(Number(($event.target as HTMLSelectElement).value))"
-        >
-          <option :value="0">▸ 最新发送（实时）</option>
-          <option v-for="e in history" :key="e.ts" :value="e.ts">
-            {{ new Date(e.ts).toLocaleString() }} · {{ e.status ?? 'ERR' }}
-          </option>
-        </select>
+        <span class="httpd-eyebrow text-muted-foreground">发送请求</span>
+        <span v-if="effPaging" class="ml-auto font-mono text-[10px] text-muted-foreground">
+          分页：{{ effPaging.mode === 'offset' ? `${effPaging.sizeParam}/${effPaging.offsetParam}` : `${effPaging.pageParam}/${effPaging.sizeParam}` }} · 每页 {{ effPaging.size }} 条
+        </span>
       </div>
       <div class="space-y-2 p-3">
         <div v-if="vars.length" class="grid gap-2 md:grid-cols-2">
@@ -211,19 +159,14 @@ function sCls(status?: number): string {
               @input="setVar(i, ($event.target as HTMLInputElement).value)" />
           </label>
         </div>
-        <div class="flex items-center gap-2 pt-0.5">
-          <button class="httpd-btn httpd-btn-accent flex-1 justify-center rounded-md px-4 py-2 text-xs font-semibold" :disabled="running" :title="'按当前接口发送请求并记录到历史；若配置了分页，将携带分页参数（' + (effPaging ? effPaging.mode === 'offset' ? effPaging.sizeParam + '/' + effPaging.offsetParam : effPaging.pageParam + '/' + effPaging.sizeParam : '未配置分页') + '）'" @click="send">
-            <span class="httpd-led" :class="running ? 'httpd-led-run bg-current' : ''" />
-            {{ running ? '发送中…' : '🚀 发送请求' }}
-          </button>
-        </div>
+        <button class="httpd-btn httpd-btn-accent w-full items-center justify-center rounded-md px-4 py-2 text-xs font-semibold" :disabled="running" :title="'按当前接口发送请求并记录到历史；若配置了分页，将携带分页参数'" @click="send">
+          <span class="httpd-led" :class="running ? 'httpd-led-run bg-current' : ''" />
+          {{ running ? '发送中…' : '🚀 发送请求' }}
+        </button>
         <p v-if="!vars.length" class="text-xs text-muted-foreground">模板中没有 {{ literalVar }} 占位符，可直接点击上方「🚀 发送请求」。</p>
       </div>
     </div>
 
-    <div v-if="notice" class="rounded border-l-2 border-l-primary border-border bg-primary/5 px-3 py-2 font-mono text-xs text-foreground">
-      <span class="font-bold">✧ 提示 · </span>{{ notice }}
-    </div>
     <div v-if="err" class="rounded border-l-2 border-l-destructive border-border bg-destructive/10 px-3 py-2 font-mono text-xs text-destructive">
       <span class="font-bold">! 错误 · </span>{{ err }}
     </div>
@@ -233,12 +176,6 @@ function sCls(status?: number): string {
         <span class="httpd-pill" :class="sCls(result.status)">{{ result.ok ? '✓' : '✕' }} {{ result.status }}</span>
         <span class="font-mono text-muted-foreground">{{ result.ms }}ms</span>
         <span class="font-mono text-muted-foreground">{{ result.size }} B</span>
-        <button v-if="parsed?.json" title="根据常见 JSON 返回格式自动推断列表路径 / 总数 / 页码 / 字段列，并补齐分页参数" class="httpd-btn rounded border border-border px-2 py-0.5 text-primary hover:bg-accent" @click="applyInfer">✧ 自动推断</button>
-        <div class="ml-auto flex gap-1">
-          <button class="rounded px-2 py-0.5 font-medium" :class="view === 'raw' ? 'bg-accent' : 'hover:bg-accent'" @click="view='raw'">原始</button>
-          <button class="rounded px-2 py-0.5 font-medium" :class="view === 'table' ? 'bg-accent' : 'hover:bg-accent'" @click="view='table'">表格</button>
-          <button class="rounded px-2 py-0.5 font-medium" :class="view === 'tree' ? 'bg-accent' : 'hover:bg-accent'" @click="view='tree'">树</button>
-        </div>
       </div>
 
       <!-- 分页器（配置了分页风格时显示） -->
@@ -251,15 +188,10 @@ function sCls(status?: number): string {
             @change="goToPage(Number(($event.target as HTMLInputElement).value) || 1)" />
         </span>
         <button title="下一页" class="httpd-btn rounded border border-border px-2.5 py-0.5 text-muted-foreground hover:bg-accent disabled:opacity-40" :disabled="running" @click="goToPage(page + 1)">下一页 ›</button>
-        <span class="ml-auto font-mono text-muted-foreground">每页 {{ effPaging.size }} 条 · {{ effPaging.mode === 'offset' ? `${effPaging.sizeParam}/${effPaging.offsetParam}` : `${effPaging.pageParam}/${effPaging.sizeParam}` }}</span>
+        <span v-if="parsed.total !== undefined" class="ml-auto font-mono text-muted-foreground">共 {{ parsed.total }} 条</span>
       </div>
 
-      <pre v-if="view === 'raw'" class="httpd-console max-h-[60vh] overflow-auto p-3 whitespace-pre-wrap">{{ result.raw }}</pre>
-      <ResponseTree v-else-if="view === 'tree'" :raw="result.raw" />
-      <div v-else-if="parsed && !parsed.ok" class="p-3 font-mono text-xs text-muted-foreground">
-        <span class="text-destructive">{{ parsed.error }}</span><span v-if="parsed.topKeys?.length">；顶层键：{{ parsed.topKeys.join(', ') }}（可点击「✧ 自动推断」）</span>
-      </div>
-      <ResponseTable v-else-if="parsed && parsed.rows.length" :rows="parsed.rows" :total="parsed.total" :page="page" :page-size="pageSize" :columns="props.api.parse.columns" :loading="running" @go="goToPage" />
+      <ResponseView :raw="result.raw" :parse="props.api.parse" :columns="props.api.parse.columns" :page="page" :page-size="Number.MAX_SAFE_INTEGER" :loading="running" />
     </div>
-  </div></TooltipProvider>
+  </div>
 </template>
