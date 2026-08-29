@@ -2,14 +2,14 @@
 import type { ApiRequest } from '@/lib/debugger/model'
 import { buildRequest } from '@/lib/debugger/builder'
 import { collectSnippet, extractPlaceholders, resolveVars } from '@/lib/debugger/variables'
-import { parseResponse, evalPath, columnsForList } from '@/lib/debugger/parse'
+import { parseResponse, inferParse } from '@/lib/debugger/parse'
 import type { ParseResult } from '@/lib/debugger/parse'
 import { effectivePaging, pagingParams } from '@/lib/debugger/paging'
 import { pushHistory, type HistoryEntry } from '@/lib/debugger/db'
 import { computed, onUnmounted, ref, watch } from 'vue'
-import ResponseView from './ResponseView.vue'
+import HistoryPanel from './HistoryPanel.vue'
 
-const props = defineProps<{ api: ApiRequest; globals: Record<string, string>; sendTick?: number }>()
+const props = defineProps<{ api: ApiRequest; globals: Record<string, string>; sendTick?: number; picked: HistoryEntry | null }>()
 const emit = defineEmits<{
   (e: 'update', api: ApiRequest): void
   (e: 'sent'): void // 发送完成后通知父级刷新左侧历史记录
@@ -17,7 +17,7 @@ const emit = defineEmits<{
 
 const globals = computed(() => props.globals)
 const running = ref(false)
-const result = ref<{ ok: boolean; status?: number; ms?: number; size?: number; raw: string } | null>(null)
+// 发送成功后用该响应同步页码；响应展示统一走「所选历史」picked
 const parsed = ref<ParseResult | null>(null)
 const err = ref('')
 const timeoutMs = 30000
@@ -72,7 +72,6 @@ function pagingOverrides(): Record<string, string> {
 async function send() {
   running.value = true
   err.value = ''
-  result.value = null
   parsed.value = null
   const log: string[] = []
   const t0 = performance.now()
@@ -109,7 +108,6 @@ async function send() {
     const entry: HistoryEntry = { ts: Date.now(), status: resp.status, ms, size, raw, console: log.join('\n') }
     await pushHistory(props.api.id, entry)
     emit('sent')
-    result.value = { ok: resp.ok, status: resp.status, ms, size, raw }
     parsed.value = parseResponse(raw, props.api.parse)
     if (parsed.value?.page !== undefined) page.value = parsed.value.page
   } catch (e) {
@@ -134,18 +132,23 @@ function goToPage(p: number) {
   void send()
 }
 
-// 在 JSON 树 / 对象「查看」里选中的新列表路径 → 更新解析配置并把表格切到该数组，可逐级向下钻
-function onPickList(path: string) {
-  if (!path) return
-  const json = parsed.value?.json ?? (result.value ? parseResponse(result.value.raw, props.api.parse).json : null)
-  if (json === null || json === undefined) {
-    emit('update', { ...props.api, parse: { ...props.api.parse, listPath: path } })
-    return
-  }
-  const arr = evalPath(json, path)
-  const cols = Array.isArray(arr) ? columnsForList(arr) : []
-  emit('update', { ...props.api, parse: { ...props.api.parse, listPath: path, columns: cols.length ? cols : props.api.parse.columns } })
+// 「自动解析」：按当前选中（最新）历史的响应，一键推断 列表/总数/页码/字段列 并启用分页，无需切到「解析」页
+function autoParse() {
+  const src = props.picked
+  if (!src?.raw) return
+  const json = parseResponse(src.raw, props.api.parse).json
+  if (!json) { window.alert('当前响应不是可推断的 JSON，无法自动解析'); return }
+  const inf = inferParse(json)
+  if (!inf) { window.alert('未在响应中找到列表数组，请手动填写 JSONPath'); return }
+  emit('update', {
+    ...props.api,
+    parse: { ...props.api.parse, listPath: inf.parse.listPath!, totalPath: inf.parse.totalPath, pagePath: inf.parse.pagePath, columns: inf.parse.columns },
+    paging: { ...props.api.paging, ...inf.paging, enabled: true },
+  })
 }
+
+// 当前选中历史的解析结果，供分页器与总数展示
+const displayParsed = computed<ParseResult | null>(() => props.picked?.raw ? parseResponse(props.picked.raw, props.api.parse) : null)
 
 const STATUS_REASON: Record<number, string> = {
   200: 'OK', 201: 'Created', 202: 'Accepted', 204: 'No Content', 206: 'Partial Content',
@@ -153,12 +156,6 @@ const STATUS_REASON: Record<number, string> = {
   400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 405: 'Method Not Allowed', 409: 'Conflict',
   418: "I'm a Teapot", 422: 'Unprocessable Entity', 429: 'Too Many Requests',
   500: 'Internal Server Error', 501: 'Not Implemented', 502: 'Bad Gateway', 503: 'Service Unavailable', 504: 'Gateway Timeout', 505: 'HTTP Version Not Supported',
-}
-
-// 状态码 -> 工业配色类
-function sCls(status?: number): string {
-  if (!status || status < 100 || status >= 600) return 'httpd-ser'
-  return `httpd-s${Math.floor(status / 100)}`
 }
 </script>
 
@@ -194,15 +191,9 @@ function sCls(status?: number): string {
       <span class="font-bold">! 错误 · </span>{{ err }}
     </div>
 
-    <div v-if="result" class="httpd-panel">
-      <div class="flex flex-wrap items-center gap-3 border-b border-border px-3 py-2 text-xs">
-        <span class="httpd-pill" :class="sCls(result.status)">{{ result.ok ? '✓' : '✕' }} {{ result.status }}</span>
-        <span class="font-mono text-muted-foreground">{{ result.ms }}ms</span>
-        <span class="font-mono text-muted-foreground">{{ result.size }} B</span>
-      </div>
-
-      <!-- 分页器（配置了分页风格时显示） -->
-      <div v-if="effPaging && parsed?.rows?.length" class="flex flex-wrap items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
+    <div v-if="picked" class="httpd-panel">
+      <!-- 分页器（配置了分页风格且能解析出列表时显示） -->
+      <div v-if="effPaging && displayParsed?.rows?.length" class="flex flex-wrap items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
         <button title="上一页" class="httpd-btn rounded border border-border px-2.5 py-0.5 text-muted-foreground hover:bg-accent disabled:opacity-40" :disabled="running || page <= 1" @click="goToPage(page - 1)">‹ 上一页</button>
         <span class="flex items-center gap-1 font-mono text-muted-foreground">
           页码
@@ -211,10 +202,18 @@ function sCls(status?: number): string {
             @change="goToPage(Number(($event.target as HTMLInputElement).value) || 1)" />
         </span>
         <button title="下一页" class="httpd-btn rounded border border-border px-2.5 py-0.5 text-muted-foreground hover:bg-accent disabled:opacity-40" :disabled="running" @click="goToPage(page + 1)">下一页 ›</button>
-        <span v-if="parsed.total !== undefined" class="ml-auto font-mono text-muted-foreground">共 {{ parsed.total }} 条</span>
+        <span v-if="displayParsed.total !== undefined" class="ml-auto font-mono text-muted-foreground">共 {{ displayParsed.total }} 条</span>
       </div>
 
-      <ResponseView :raw="result.raw" :parse="props.api.parse" :columns="props.api.parse.columns" :page="page" :page-size="Number.MAX_SAFE_INTEGER" :loading="running" @pick="onPickList" />
+      <HistoryPanel :entry="picked" :parse="props.api.parse" :columns="props.api.parse.columns" default-view="list">
+        <template #actions>
+          <button
+            class="ml-2 shrink-0 rounded border border-border px-2 py-0.5 text-xs font-semibold text-primary hover:bg-accent"
+            :disabled="!picked.raw"
+            title="按当前响应的响应体自动推断 列表 / 总数 / 页码 / 字段列，并启用分页"
+            @click="autoParse">✨ 自动解析</button>
+        </template>
+      </HistoryPanel>
     </div>
   </div>
 </template>

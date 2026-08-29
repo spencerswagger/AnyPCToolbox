@@ -5,7 +5,6 @@ import { getApis, saveApis, getGlobals, saveGlobals, getHistory, type HistoryEnt
 import ConfigPanel from '@/components/debugger/ConfigPanel.vue'
 import ParsePanel from '@/components/debugger/ParsePanel.vue'
 import RunPanel from '@/components/debugger/RunPanel.vue'
-import HistoryPanel from '@/components/debugger/HistoryPanel.vue'
 import EnvPanel from '@/components/debugger/EnvPanel.vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
@@ -39,14 +38,23 @@ onMounted(async () => {
   }
 })
 
-// 切换当前接口：重置历史选中并加载该接口的历史
+// 切换当前接口：重置历史选中并加载该接口的历史（默认选中最新一条）
 watch(currentId, async (id) => {
-  pickedHistory.value = null
   dirtyMap.value = { ...dirtyMap.value, [id]: false }
-  if (id) history.value = await getHistory(id)
+  if (id) {
+    history.value = await getHistory(id)
+    pickedHistory.value = history.value[0] ?? null
+  }
 })
 async function loadHistory() {
-  if (currentId.value) history.value = await getHistory(currentId.value)
+  if (currentId.value) {
+    history.value = await getHistory(currentId.value)
+    pickNewestHistory()
+  }
+}
+// 默认选中最新一条历史（pushHistory 是 unshift，列表最前即最新）
+function pickNewestHistory() {
+  pickedHistory.value = history.value[0] ?? null
 }
 
 // 编辑只更新内存，由「保存」按钮主动持久化
@@ -113,9 +121,6 @@ function removeApi(id: string) {
 // ---- 历史：选中后即在下方面板查看 控制台 / JSON / 列表（不自动切换到「调试」页）----
 function pickHistory(e: HistoryEntry) {
   pickedHistory.value = e
-}
-function clearPicked() {
-  pickedHistory.value = null
 }
 function onSent() { void loadHistory() }
 function goRun() { activeTab.value = 'run' }
@@ -239,16 +244,7 @@ const tabs = [
         <template v-else-if="currentApi">
           <ConfigPanel v-if="activeTab === 'request'" :api="currentApi" :dirty="dirty" @update="update" @save="persistCurrent" @send="onRequestSend" />
           <ParsePanel v-else-if="activeTab === 'parse'" :api="currentApi" :history="history" :picked="pickedHistory" @update="update" @go-run="goRun" />
-          <RunPanel v-else :api="currentApi" :globals="globals" :send-tick="sendTick" @update="update" @sent="onSent" />
-
-          <!-- 历史详情：选中历史后始终展示（含 控制台 / JSON / 列表 切换），不跳转「调试」页 -->
-          <div v-if="pickedHistory" class="mt-4">
-            <div class="mb-2 flex items-center gap-2">
-              <span class="httpd-eyebrow text-muted-foreground">历史详情</span>
-              <button class="ml-auto text-xs text-muted-foreground hover:text-accent-foreground" title="取消选中该历史记录" @click="clearPicked">✕ 取消选择</button>
-            </div>
-            <HistoryPanel :entry="pickedHistory" :parse="currentApi.parse" :columns="currentApi.parse.columns" />
-          </div>
+          <RunPanel v-else :api="currentApi" :globals="globals" :send-tick="sendTick" :picked="pickedHistory" @update="update" @sent="onSent" />
         </template>
       </main>
     </div>

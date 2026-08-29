@@ -2,12 +2,19 @@
 import type { HistoryEntry } from '@/lib/debugger/db'
 import type { ColumnDef, ParseConfig } from '@/lib/debugger/model'
 import { parseResponse } from '@/lib/debugger/parse'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import ResponseTable from './ResponseTable.vue'
 import JsonTree from './JsonTree.vue'
 
-const props = defineProps<{ entry: HistoryEntry | null; parse: ParseConfig; columns: ColumnDef[] }>()
-const view = ref<'console' | 'json' | 'list'>('console')
+const props = withDefaults(defineProps<{
+  entry: HistoryEntry | null
+  parse: ParseConfig
+  columns: ColumnDef[]
+  // 默认激活的标签：'list' 表示“能解析成列表就切到列表，否则切到 JSON”（供「调试」页使用）
+  defaultView?: 'console' | 'json' | 'list'
+}>(), { defaultView: 'console' })
+
+type ViewName = 'console' | 'json' | 'list'
 
 type Line = { t: string; c: string }
 // 将 console 文本拆为带行级配色的行（模仿 curl 的 * / > / < 语义）
@@ -48,6 +55,17 @@ function listRows(): unknown[] {
   if (!props.entry?.raw) return []
   return parseResponse(props.entry.raw, effParse.value).rows
 }
+// 依据默认标签决定初始激活哪个视图：默认 list 时“能解析成列表→列表，否则→JSON”
+function initialView(): ViewName {
+  if (props.defaultView === 'list') {
+    const raw = props.entry?.raw ?? ''
+    return raw && parseResponse(raw, props.parse).rows.length > 0 ? 'list' : 'json'
+  }
+  return props.defaultView
+}
+const view = ref<ViewName>(initialView())
+// 换了一条历史（发送产生新记录 / 点了别的时间点）→ 回到默认标签
+watch(() => props.entry?.ts, () => { view.value = initialView() })
 
 const viewOpts = [
   { k: 'console' as const, label: '控制台', title: '完整的请求 / 响应收发过程日志' },
@@ -62,6 +80,7 @@ const viewOpts = [
       <span class="httpd-eyebrow text-muted-foreground">请求记录</span>
       <span class="httpd-pill" :class="sCls(entry.status)">{{ entry.status ?? 'ERR' }}</span>
       <span class="font-mono text-muted-foreground">{{ new Date(entry.ts).toLocaleString() }}</span>
+      <slot name="actions" />
       <span class="ml-auto flex gap-1">
         <button
           v-for="o in viewOpts" :key="o.k"
