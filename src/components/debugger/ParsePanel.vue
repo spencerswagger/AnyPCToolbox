@@ -2,7 +2,7 @@
 import type { ApiRequest, ColumnDef, ColumnType, PagingConfig } from '@/lib/debugger/model'
 import type { HistoryEntry } from '@/lib/debugger/db'
 import { PAGING_PRESETS, presetToConfig, type PagingPreset } from '@/lib/debugger/paging'
-import { parseResponse, inferParse } from '@/lib/debugger/parse'
+import { parseResponse, inferParse, evalPath, columnsForList } from '@/lib/debugger/parse'
 import FieldTip from './FieldTip.vue'
 import ResponseView from './ResponseView.vue'
 import { computed } from 'vue'
@@ -14,7 +14,7 @@ const emit = defineEmits<{
   (e: 'goRun'): void
 }>()
 
-const colTypes = ['text', 'number', 'bool', 'enum', 'image', 'datetime', 'link'] as const
+const colTypes = ['text', 'number', 'bool', 'enum', 'image', 'datetime', 'link', 'object', 'array'] as const
 
 function patchParse(p: Partial<ApiRequest['parse']>) {
   emit('update', { ...props.api, parse: { ...props.api.parse, ...p } })
@@ -40,6 +40,15 @@ function removeCol(i: number) {
 }
 function addCol() {
   setCols([...props.api.parse.columns, { field: '', title: '', type: 'text' }])
+}
+
+// 在预览 JSON 树 / 对象「查看」里选中新列表 → 更新 listPath 并按新列表重推字段列（递归下钻）
+function onPickList(path: string) {
+  if (!path) return
+  const json = props.picked?.raw ? parseResponse(props.picked.raw, props.api.parse).json : null
+  const arr = json !== null && json !== undefined ? evalPath(json, path) : null
+  const cols = Array.isArray(arr) ? columnsForList(arr) : []
+  emit('update', { ...props.api, parse: { ...props.api.parse, listPath: path, columns: cols.length ? cols : props.api.parse.columns } })
 }
 
 // ---- 对「所选历史响应」自动推断解析与分页 ----
@@ -98,7 +107,7 @@ function applyPreset(key: string) {
               <span class="ml-auto font-mono">{{ picked.ms }}ms{{ picked.size !== undefined ? ' · ' + picked.size + ' B' : '' }}</span>
             </div>
             <p v-if="!picked.raw" class="font-mono text-xs text-destructive">{{ picked.error ?? '该历史记录无响应体' }}</p>
-            <ResponseView v-else :raw="picked.raw" :parse="api.parse" :columns="api.parse.columns" />
+            <ResponseView v-else :raw="picked.raw" :parse="api.parse" :columns="api.parse.columns" @pick="onPickList" />
           </template>
           <div v-else-if="history.length" class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
             <span>▸ 请在左侧「历史记录」选择一条响应来解析。</span>

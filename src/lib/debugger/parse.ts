@@ -62,12 +62,29 @@ function guessType(v: unknown): ColumnType {
     if (v.startsWith('http://') || v.startsWith('https://')) return 'link'
     if (/^\d{4}-\d{2}-\d{2}(?:[T ]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?$/.test(v)) return 'datetime'
   }
+  if (v !== null && typeof v === 'object') {
+    if (Array.isArray(v)) {
+      // 数组首元素是对象才算「数组<对象>」列；否则仍当作 text
+      const first = v[0]
+      return first !== null && typeof first === 'object' && !Array.isArray(first) ? 'array' : 'text'
+    }
+    return 'object'
+  }
   return 'text'
 }
 
 function inferColumns(row: unknown): ColumnDef[] {
   if (typeof row !== 'object' || row === null || Array.isArray(row)) return []
   return Object.entries(row as Record<string, unknown>).map(([k, v]) => ({ field: k, title: '', type: guessType(v) }))
+}
+
+// 取某个 JSONPath 在 json 中命中的值（供「设为列表」等运行时下钻使用）
+export function evalPath(json: unknown, path: string): unknown {
+  return pick(path, json)
+}
+// 根据列表数组重新推断字段列（对象字段为 object，对象数组为 array，保证「查看」列类型一致）
+export function columnsForList(list: unknown): ColumnDef[] {
+  return Array.isArray(list) && list.length ? inferColumns(list[0]) : []
 }
 
 function findArrayAfterScan(root: Record<string, unknown>): { listPath: string; listOwner: Record<string, unknown>; list: unknown[] } | null {

@@ -1,6 +1,6 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'
 export type BodyType = 'none' | 'json' | 'form' | 'text'
-export type ColumnType = 'text' | 'number' | 'bool' | 'enum' | 'image' | 'datetime' | 'link'
+export type ColumnType = 'text' | 'number' | 'bool' | 'enum' | 'image' | 'datetime' | 'link' | 'object' | 'array'
 
 export interface KvItem {
   key: string

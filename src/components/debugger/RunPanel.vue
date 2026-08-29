@@ -2,7 +2,7 @@
 import type { ApiRequest } from '@/lib/debugger/model'
 import { buildRequest } from '@/lib/debugger/builder'
 import { collectSnippet, extractPlaceholders, resolveVars } from '@/lib/debugger/variables'
-import { parseResponse } from '@/lib/debugger/parse'
+import { parseResponse, evalPath, columnsForList } from '@/lib/debugger/parse'
 import type { ParseResult } from '@/lib/debugger/parse'
 import { effectivePaging, pagingParams } from '@/lib/debugger/paging'
 import { pushHistory, type HistoryEntry } from '@/lib/debugger/db'
@@ -107,7 +107,7 @@ async function send() {
     log.push(`* Received ${size} B`)
     log.push('* Connection closed')
     const entry: HistoryEntry = { ts: Date.now(), status: resp.status, ms, size, raw, console: log.join('\n') }
-    void pushHistory(props.api.id, entry)
+    await pushHistory(props.api.id, entry)
     emit('sent')
     result.value = { ok: resp.ok, status: resp.status, ms, size, raw }
     parsed.value = parseResponse(raw, props.api.parse)
@@ -119,7 +119,7 @@ async function send() {
     const msg = aborted ? '请求超时' : '请求失败（多为 CORS 跨域限制或网络不可达）'
     log.push('', aborted ? `* Operation timed out after ${ms}ms` : `* Error: ${msg}`)
     const entry: HistoryEntry = { ts: Date.now(), status: undefined, ms, error: msg, console: log.join('\n') }
-    void pushHistory(props.api.id, entry)
+    await pushHistory(props.api.id, entry)
     emit('sent')
     err.value = '发送失败：' + msg
   } finally {
@@ -132,6 +132,19 @@ function goToPage(p: number) {
   if (next === page.value) return
   page.value = next
   void send()
+}
+
+// 在 JSON 树 / 对象「查看」里选中的新列表路径 → 更新解析配置并把表格切到该数组，可逐级向下钻
+function onPickList(path: string) {
+  if (!path) return
+  const json = parsed.value?.json ?? (result.value ? parseResponse(result.value.raw, props.api.parse).json : null)
+  if (json === null || json === undefined) {
+    emit('update', { ...props.api, parse: { ...props.api.parse, listPath: path } })
+    return
+  }
+  const arr = evalPath(json, path)
+  const cols = Array.isArray(arr) ? columnsForList(arr) : []
+  emit('update', { ...props.api, parse: { ...props.api.parse, listPath: path, columns: cols.length ? cols : props.api.parse.columns } })
 }
 
 const STATUS_REASON: Record<number, string> = {
@@ -201,7 +214,7 @@ function sCls(status?: number): string {
         <span v-if="parsed.total !== undefined" class="ml-auto font-mono text-muted-foreground">共 {{ parsed.total }} 条</span>
       </div>
 
-      <ResponseView :raw="result.raw" :parse="props.api.parse" :columns="props.api.parse.columns" :page="page" :page-size="Number.MAX_SAFE_INTEGER" :loading="running" />
+      <ResponseView :raw="result.raw" :parse="props.api.parse" :columns="props.api.parse.columns" :page="page" :page-size="Number.MAX_SAFE_INTEGER" :loading="running" @pick="onPickList" />
     </div>
   </div>
 </template>

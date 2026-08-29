@@ -4,6 +4,7 @@ import type { ColumnDef, ParseConfig } from '@/lib/debugger/model'
 import { parseResponse } from '@/lib/debugger/parse'
 import { computed, ref } from 'vue'
 import ResponseTable from './ResponseTable.vue'
+import JsonTree from './JsonTree.vue'
 
 const props = defineProps<{ entry: HistoryEntry | null; parse: ParseConfig; columns: ColumnDef[] }>()
 const view = ref<'console' | 'json' | 'list'>('console')
@@ -24,16 +25,29 @@ function sCls(status?: number): string {
   return `httpd-s${Math.floor(status / 100)}`
 }
 
+// 响应体是否解析为 JSON 树（JSON 视图用交互式树展示）
+const jsonValue = computed<unknown | null>(() => {
+  const raw = props.entry?.raw ?? ''
+  try { return JSON.parse(raw) } catch { return null }
+})
+// 本地下钻得取的列表路径（在 JSON 树 / 对象「查看」里选中的数组），用于递归查看嵌套列表
+const localPath = ref<string | null>(null)
+const effParse = computed<ParseConfig>(() => ({ ...props.parse, listPath: localPath.value ?? props.parse.listPath }))
 // 响应体是否能解析为列表 → 「列表」标签可用
 const canList = computed(() => {
   if (!props.entry?.raw) return false
-  return parseResponse(props.entry.raw, props.parse).rows.length > 0
+  return parseResponse(props.entry.raw, effParse.value).rows.length > 0
 })
-// JSON 视图：优先漂亮打印，否则原样文本
-const jsonText = computed(() => {
-  const raw = props.entry?.raw ?? ''
-  try { return JSON.stringify(JSON.parse(raw), null, 2) } catch { return raw }
-})
+// 点击 JSON 树里的「设为列表」→ 下钻到该数组并切到「列表」视图
+function pickList(path: string) {
+  if (!path) return
+  localPath.value = path
+  view.value = 'list'
+}
+function listRows(): unknown[] {
+  if (!props.entry?.raw) return []
+  return parseResponse(props.entry.raw, effParse.value).rows
+}
 
 const viewOpts = [
   { k: 'console' as const, label: '控制台', title: '完整的请求 / 响应收发过程日志' },
@@ -62,12 +76,13 @@ const viewOpts = [
     <div v-if="view === 'console'" class="httpd-console max-h-[50vh] overflow-auto p-3">
       <span v-for="(ln, i) in consoleLines(entry.console)" :key="i" :class="ln.c" class="block whitespace-pre">{{ ln.t }}</span>
     </div>
-    <div v-else-if="view === 'json'" class="httpd-console max-h-[50vh] overflow-auto p-3">
-      <pre class="whitespace-pre-wrap font-mono text-xs text-foreground">{{ jsonText }}</pre>
+    <div v-else-if="view === 'json'" class="httpd-console max-h-[50vh] overflow-auto">
+      <JsonTree v-if="jsonValue !== null" :value="jsonValue" :pickable="true" max-height-class="" @pick="pickList" />
+      <pre v-else class="whitespace-pre-wrap p-3 font-mono text-xs text-foreground">{{ entry.raw }}</pre>
     </div>
     <div v-else class="httpd-console max-h-[50vh] overflow-auto">
-      <ResponseTable v-if="canList && entry.raw" :rows="parseResponse(entry.raw, parse).rows" :columns="columns" :page-size="Number.MAX_SAFE_INTEGER" />
-      <p v-else class="p-3 font-mono text-xs text-muted-foreground">{{ entry.error ?? '该响应未匹配到列表，请先到「解析」页配置列表路径或点「✧ 自动推断」' }}</p>
+      <ResponseTable v-if="canList && entry.raw" :rows="listRows()" :columns="columns" :page-size="Number.MAX_SAFE_INTEGER" :list-path="effParse.listPath" @pick="pickList" />
+      <p v-else class="p-3 font-mono text-xs text-muted-foreground">{{ entry.error ?? '该响应未匹配到列表，请先在 JSON 视图里把鼠标移到某个数组上点「⇘ 设为列表」，或到「解析」页配置列表路径' }}</p>
     </div>
   </div>
 </template>

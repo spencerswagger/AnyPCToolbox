@@ -2,9 +2,10 @@
 import type { ColumnDef } from '@/lib/debugger/model'
 import { toCellView } from '@/lib/debugger/renderers'
 import { computed, ref } from 'vue'
+import ObjectCell from './ObjectCell.vue'
 
-const props = defineProps<{ rows: unknown[]; total?: number; page?: number; pageSize: number; columns: ColumnDef[]; loading?: boolean }>()
-const emit = defineEmits<{ (e: 'go', page: number): void }>()
+const props = withDefaults(defineProps<{ rows: unknown[]; total?: number; page?: number; pageSize: number; columns: ColumnDef[]; loading?: boolean; listPath?: string }>(), { listPath: '' })
+const emit = defineEmits<{ (e: 'go', page: number): void; (e: 'pick', path: string): void }>()
 const previewUrl = ref('')
 
 const pageCount = computed(() => props.total !== undefined ? Math.max(1, Math.ceil(props.total / props.pageSize)) : Math.max(1, Math.ceil(props.rows.length / Math.max(1, props.pageSize))))
@@ -14,6 +15,24 @@ const cols = computed(() => {
   const effective = props.columns.filter((c) => c.field)
   return effective.length ? effective : [...seen].map((k) => ({ field: k, title: k, type: 'text' as const }))
 })
+
+// 对象 / 数组值 → 用「查看」单元格展示（悬停出树、点击弹 JSON 树）
+function isObjVal(v: unknown): boolean {
+  return v !== null && typeof v === 'object'
+}
+// 该字段值在完整响应中的绝对 JSONPath（用于递归「设为列表」下钻）
+function cellPath(rowIndex: number, field: string): string {
+  const lp = (props.listPath || '').trim()
+  if (!lp) return ''
+  let base = lp.startsWith('$') ? lp.slice(1).replace(/^\./, '') : lp
+  return `$${base ? '.' + base : ''}[${rowIndex}].${field}`
+}
+const pathEnabled = computed(() => !!(props.listPath || '').trim())
+// 「查看」单元格是否允许进一步「设为列表」下钻
+const pickable = computed(() => pathEnabled.value || !!(props.total || props.rows.length))
+function cellVal(r: unknown, field: string): unknown {
+  return (r as Record<string, unknown>)[field]
+}
 </script>
 
 <template>
@@ -28,11 +47,19 @@ const cols = computed(() => {
         <tbody>
           <tr v-for="(r, i) in rows" :key="i" class="border-b border-border/60 hover:bg-accent/40" :class="i % 2 ? 'bg-muted/20' : ''">
             <td v-for="c in cols" :key="c.field" class="px-3 py-2 align-middle">
-            <img v-if="toCellView((r as Record<string, unknown>)[c.field], c).kind === 'image'"
-              :src="toCellView((r as Record<string, unknown>)[c.field], c).text" class="h-10 w-10 cursor-zoom-in rounded object-cover" @click="previewUrl = toCellView((r as Record<string, unknown>)[c.field], c).text" />
-            <a v-else-if="toCellView((r as Record<string, unknown>)[c.field], c).kind === 'link'"
-              :href="toCellView((r as Record<string, unknown>)[c.field], c).text" target="_blank" rel="noreferrer" class="text-primary hover:underline">{{ toCellView((r as Record<string, unknown>)[c.field], c).text }}</a>
-            <span v-else>{{ toCellView((r as Record<string, unknown>)[c.field], c).text || '-' }}</span>
+            <ObjectCell
+              v-if="isObjVal(cellVal(r, c.field))"
+              :value="cellVal(r, c.field)"
+              :base-path="cellPath(i, c.field)"
+              :title="c.field"
+              :pickable="pickable"
+              @pick="(p) => emit('pick', p)"
+            />
+            <img v-else-if="toCellView(cellVal(r, c.field), c).kind === 'image'"
+              :src="toCellView(cellVal(r, c.field), c).text" class="h-10 w-10 cursor-zoom-in rounded object-cover" @click="previewUrl = toCellView(cellVal(r, c.field), c).text" />
+            <a v-else-if="toCellView(cellVal(r, c.field), c).kind === 'link'"
+              :href="toCellView(cellVal(r, c.field), c).text" target="_blank" rel="noreferrer" class="text-primary hover:underline">{{ toCellView(cellVal(r, c.field), c).text }}</a>
+            <span v-else>{{ toCellView(cellVal(r, c.field), c).text || '-' }}</span>
           </td>
         </tr>
       </tbody>
