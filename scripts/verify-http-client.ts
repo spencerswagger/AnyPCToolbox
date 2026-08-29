@@ -3,6 +3,7 @@
 import { extractPlaceholders, resolveVars, replaceAll, collectSnippet } from '../src/lib/debugger/variables.ts'
 import { buildRequest } from '../src/lib/debugger/builder.ts'
 import { parseResponse } from '../src/lib/debugger/parse.ts'
+import { toCellView } from '../src/lib/debugger/renderers.ts'
 
 let failed = 0
 function check(name: string, cond: boolean, detail = ''): void {
@@ -61,6 +62,21 @@ check('路径未命中 → 标记 ok:false', empty.ok === false)
 check('topKeys 提供顶层键', Array.isArray(empty.topKeys) && empty.topKeys.includes('code'))
 const bad = parseResponse('not json', { listPath: '$.list', columns: [] })
 check('非法 JSON → error 提示', bad.ok === false && typeof bad.error === 'string')
+
+console.log('单元格渲染')
+const enumCol = { field: 's', title: '性别', type: 'enum' as const, enumMap: { '1': '男', '2': '女' } }
+check('enum 1 → 男', toCellView(1, enumCol).text === '男')
+check('enum 未命中 → 原文', toCellView(9, enumCol).text === '9')
+const imgCol = { field: 'u', title: '图', type: 'image' as const }
+check('image 判定为图片', toCellView('https://x.com/a.png', imgCol).kind === 'image')
+const dtCol = { field: 't', title: '时间', type: 'datetime' as const }
+check('datetime 秒级时间戳格式化', /2023/.test(toCellView(1693948800, dtCol).text), toCellView(1693948800, dtCol).text)
+check('datetime 毫秒级时间戳格式化', /2023/.test(toCellView(1693948800000, dtCol).text))
+const boolCol = { field: 'b', title: '启用', type: 'bool' as const }
+check('bool true → 是', toCellView(true, boolCol).text === '是')
+const linkCol = { field: 'l', title: '链', type: 'link' as const }
+check('link 判定为链接', toCellView('https://x.com', linkCol).kind === 'link')
+check('text 普通字符串', toCellView('hi', { field: 'x', title: 'x', type: 'text' as const }).kind === 'text')
 
 console.log(failed === 0 ? '\n全部通过' : `\n${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)
