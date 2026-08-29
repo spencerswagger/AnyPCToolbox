@@ -4,14 +4,14 @@ import { buildRequest } from '@/lib/debugger/builder'
 import { collectSnippet, extractPlaceholders, resolveVars } from '@/lib/debugger/variables'
 import { parseResponse } from '@/lib/debugger/parse'
 import type { ParseResult } from '@/lib/debugger/parse'
-import { getGlobals, pushHistory } from '@/lib/debugger/db'
-import { computed, onMounted, ref, watch } from 'vue'
+import { pushHistory } from '@/lib/debugger/db'
+import { computed, ref, watch } from 'vue'
 import ResponseTable from './ResponseTable.vue'
 
-const props = defineProps<{ api: ApiRequest }>()
+const props = defineProps<{ api: ApiRequest; globals: Record<string, string> }>()
 const emit = defineEmits<{ (e: 'update', api: ApiRequest): void }>()
 
-const globals = ref<Record<string, string>>({})
+const globals = computed(() => props.globals)
 const running = ref(false)
 const result = ref<{ ok: boolean; status?: number; ms?: number; size?: number; raw: string } | null>(null)
 const parsed = ref<ParseResult | null>(null)
@@ -21,8 +21,6 @@ const timeoutMs = 30000
 const literalVar = '{{var}}'
 const pageSize = 10
 const page = ref(1)
-
-onMounted(async () => { globals.value = await getGlobals() })
 
 // 从模板自动提取占位符并合并到变量（不覆盖已有默认值/描述）
 const varNames = computed(() => extractPlaceholders([collectSnippet(props.api)]))
