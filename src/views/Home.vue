@@ -51,6 +51,13 @@ const tools = [
     route: '/units',
     tag: 'v1.0',
   },
+  {
+    icon: '🧪',
+    name: 'HTTP 接口调试',
+    description: '请求模板+变量、JSONPath 分页表格、字段类型渲染，纯前端调试任意接口',
+    route: '/http-client',
+    tag: 'v1.0',
+  },
 ]
 </script>
 
