@@ -34,7 +34,7 @@ onMounted(load)
 <template>
   <div class="httpd-panel">
     <div class="httpd-panel-title">
-      <span class="httpd-eyebrow text-muted-foreground">history</span>
+      <span class="httpd-eyebrow text-muted-foreground" title="该接口每次发送（成功或失败）都会记录在这里，点击任意一条可查看它的控制台日志与响应内容">历史记录</span>
       <span class="text-xs text-muted-foreground">（{{ entries.length }}）</span>
     </div>
     <ul v-if="entries.length" class="divide-y divide-border">
@@ -44,15 +44,16 @@ onMounted(load)
         <span class="ml-auto shrink-0 font-mono text-muted-foreground">{{ e.size !== undefined ? (e.ms + 'ms · ' + e.size + 'B') : (e.ms + 'ms') }}</span>
       </li>
     </ul>
-    <p v-else class="p-4 font-mono text-xs text-muted-foreground">// no requests yet</p>
+    <p v-else class="p-4 font-mono text-xs text-muted-foreground">// 暂无请求记录，请在「运行」页发送一次请求</p>
   </div>
 
   <div v-if="picked" class="httpd-panel mt-3">
     <div class="httpd-panel-title">
-      <span class="httpd-eyebrow text-muted-foreground">entry</span>
+      <span class="httpd-eyebrow text-muted-foreground">请求记录</span>
+      <span class="font-mono text-muted-foreground">{{ new Date(picked.ts).toLocaleString() }}</span>
       <span class="ml-auto flex gap-1">
-        <button class="rounded px-2 py-0.5 text-xs font-medium" :class="view === 'console' ? 'bg-accent' : 'hover:bg-accent'" @click="view='console'">console</button>
-        <button class="rounded px-2 py-0.5 text-xs font-medium" :class="view === 'response' ? 'bg-accent' : 'hover:bg-accent'" @click="view='response'">response</button>
+        <button class="rounded px-2 py-0.5 text-xs font-medium" :class="view === 'console' ? 'bg-accent' : 'hover:bg-accent'" @click="view='console'" title="查看该请求完整的发送过程日志（请求行、请求头、响应行、耗时等）">控制台</button>
+        <button class="rounded px-2 py-0.5 text-xs font-medium" :class="view === 'response' ? 'bg-accent' : 'hover:bg-accent'" @click="view='response'" title="查看该请求的响应原始内容">响应</button>
       </span>
     </div>
     <div v-if="view === 'console'" class="httpd-console max-h-[50vh] overflow-auto p-3">

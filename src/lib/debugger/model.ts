@@ -28,6 +28,16 @@ export interface ParseConfig {
   columns: ColumnDef[]
 }
 
+export type PagingMode = 'page' | 'offset'
+export interface PagingConfig {
+  enabled: boolean
+  mode: PagingMode // page：页码+每页条数；offset：limit+offset 游标分页
+  pageParam: string // 页码参数名，如 page / pageNumber / current
+  sizeParam: string // 每页条数参数名，如 pageSize / size / per_page / limit
+  offsetParam: string // 偏移参数名（offset 模式），如 offset / start / skip
+  size: number // 每页条数
+}
+
 export interface ApiRequest {
   id: string
   protocol: 'http' // 预留 'ws' | 'graphql'
@@ -40,6 +50,7 @@ export interface ApiRequest {
   bodyText: string // 可含 {{var}}
   variables: VariableDef[]
   parse: ParseConfig
+  paging: PagingConfig
   updatedAt: number
 }
 
@@ -58,6 +69,7 @@ export function createApiRequest(partial: Partial<ApiRequest> = {}): ApiRequest 
     bodyText: partial.bodyText ?? '',
     variables: partial.variables ?? [],
     parse: { listPath: '', columns: [], ...partial.parse },
+    paging: { enabled: false, mode: 'page', pageParam: 'page', sizeParam: 'pageSize', offsetParam: 'offset', size: 10, ...partial.paging },
     updatedAt: partial.updatedAt ?? Date.now(),
   }
 }

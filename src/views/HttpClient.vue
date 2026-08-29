@@ -97,9 +97,9 @@ function mCls(m?: string): string {
   return map[key] ?? 'httpd-m-options'
 }
 const tabs = [
-  { key: 'config', label: 'config' },
-  { key: 'run', label: 'run · viz' },
-  { key: 'history', label: 'history' },
+  { key: 'config', label: '配置 Config' },
+  { key: 'run', label: '运行 Run·Viz' },
+  { key: 'history', label: '历史 History' },
 ] as const
 </script>
 
@@ -120,10 +120,10 @@ const tabs = [
       <aside v-if="!collapsed" class="w-60 shrink-0 overflow-y-auto border-r border-border bg-card">
         <div class="flex items-center justify-between border-b border-border px-2 py-2">
           <span class="flex items-center gap-1.5 px-1">
-            <button class="text-xs text-muted-foreground hover:text-accent-foreground" title="折叠接口列表" @click="collapsed = true">‹</button>
-            <span class="httpd-eyebrow text-muted-foreground">endpoints</span>
+            <button class="text-xs text-muted-foreground hover:text-accent-foreground" title="把接口列表收起到最左侧，为主区域腾出空间" @click="collapsed = true">‹</button>
+            <span class="httpd-eyebrow text-muted-foreground">接口列表</span>
           </span>
-          <button class="httpd-btn rounded border border-border px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground" @click="createApi">+ new</button>
+          <button class="httpd-btn rounded border border-border px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground" title="新建一个空接口" @click="createApi">+ 新建</button>
         </div>
         <ul class="space-y-0.5 p-1.5">
           <li v-for="a in Object.values(apis)" :key="a.id" class="group flex items-center gap-1">
@@ -147,7 +147,7 @@ const tabs = [
       </aside>
       <button v-else class="flex w-9 shrink-0 flex-col items-center justify-center gap-1 border-r border-border bg-card text-muted-foreground hover:text-accent-foreground" title="展开接口列表" @click="collapsed = false">
         <span class="font-mono text-lg leading-none">›</span>
-        <span class="httpd-eyebrow" style="writing-mode: vertical-rl">endpoints</span>
+        <span class="httpd-eyebrow" style="writing-mode: vertical-rl">接口列表</span>
       </button>
 
       <main class="min-w-0 flex-1 overflow-auto p-4">
@@ -156,7 +156,8 @@ const tabs = [
             :class="activeTab === t.key ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-accent-foreground'"
             @click="activeTab = t.key">{{ t.label }}</button>
           <button class="ml-auto rounded px-3 py-2 text-xs font-medium tracking-wide hover:bg-accent hover:text-accent-foreground"
-            :class="showEnv ? 'text-primary' : 'text-muted-foreground'" @click="showEnv = !showEnv">ENV: globals / import</button>
+            :title="'全局变量与接口导入：可设置默认的环境变量，或从 OpenAPI / curl 导入接口'"
+            :class="showEnv ? 'text-primary' : 'text-muted-foreground'" @click="showEnv = !showEnv">环境变量 / 导入</button>
         </div>
         <EnvPanel v-if="showEnv && currentApi" :globals="globals" :api="currentApi" @globals="setGlobals" @import="onImport" />
         <template v-else-if="currentApi">
@@ -171,7 +172,7 @@ const tabs = [
       <span v-if="currentApi" class="httpd-chip" :class="mCls(currentApi.method)">{{ currentApi.method }}</span>
       <span class="min-w-0 truncate font-medium text-foreground">{{ currentApi?.name ?? '—' }}</span>
       <span class="min-w-0 truncate font-mono">{{ currentApi?.urlTemplate || '—' }}</span>
-      <span class="ml-auto shrink-0">updated:&nbsp;{{ fmtTime(currentApi?.updatedAt) || '—' }}</span>
+      <span class="ml-auto shrink-0" title="该接口最后一次保存的时间">更新于：{{ fmtTime(currentApi?.updatedAt) || '—' }}</span>
     </footer>
   </div>
 </template>

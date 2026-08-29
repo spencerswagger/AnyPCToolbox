@@ -296,6 +296,20 @@
 .dark .httpd-console .ln-ack { color: #94a3b8; }
 .dark .httpd-console .ln-err { color: #f87171; }
 
+/* ---- 树状视图值配色 ---- */
+.httpd .tv-j-str  { color: #16a34a; }
+.httpd .tv-j-num  { color: #0ea5e9; }
+.httpd .tv-j-bool { color: #8b5cf6; }
+.httpd .tv-j-null { color: #94a3b8; }
+.httpd .tv-j-key  { color: #c2410c; font-weight: 600; }
+.httpd .tv-el     { color: #8b5cf6; }
+.dark .httpd .tv-j-str  { color: #4ade80; }
+.dark .httpd .tv-j-num  { color: #38bdf8; }
+.dark .httpd .tv-j-bool { color: #a78bfa; }
+.dark .httpd .tv-j-null { color: #94a3b8; }
+.dark .httpd .tv-j-key  { color: #fdba74; }
+.dark .httpd .tv-el     { color: #a78bfa; }
+
 /* ---- 面板分组：直角、顶部强调线 ---- */
 .httpd-panel {
   border: 1px solid hsl(var(--border));

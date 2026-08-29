@@ -8,11 +8,16 @@ export type BuiltRequest = {
   body?: string
 }
 
-export function buildRequest(api: ApiRequest, resolved: Record<string, string>): BuiltRequest {
+export function buildRequest(api: ApiRequest, resolved: Record<string, string>, overrides: Record<string, string> = {}): BuiltRequest {
   let url = replaceAll(api.urlTemplate, resolved)
-  const query = api.query
-    .filter((q) => q.key.trim() !== '')
-    .map((q) => `${encodeURIComponent(q.key)}=${encodeURIComponent(replaceAll(q.value, resolved))}`)
+  const qmap = new Map<string, string>()
+  for (const q of api.query) {
+    if (q.key.trim() === '') continue
+    qmap.set(q.key, encodeURIComponent(replaceAll(q.value, resolved)))
+  }
+  // 分页等运行时注入的参数：存在同名则覆盖，避免重复
+  for (const [k, v] of Object.entries(overrides)) qmap.set(k, encodeURIComponent(v))
+  const query = [...qmap].map(([k, v]) => `${encodeURIComponent(k)}=${v}`)
   if (query.length) url += (url.includes('?') ? '&' : '?') + query.join('&')
 
   const headers = api.headers.filter((h) => h.key.trim() !== '').map((h): [string, string] => [h.key, replaceAll(h.value, resolved)])
