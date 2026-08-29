@@ -3,6 +3,7 @@ import type { HistoryEntry } from '@/lib/debugger/db'
 import type { ColumnDef, ParseConfig } from '@/lib/debugger/model'
 import { parseResponse } from '@/lib/debugger/parse'
 import { computed, ref, watch } from 'vue'
+import { TooltipProvider } from 'radix-vue'
 import ResponseTable from './ResponseTable.vue'
 import JsonTree from './JsonTree.vue'
 
@@ -75,8 +76,9 @@ const viewOpts = [
 </script>
 
 <template>
-  <div v-if="entry" class="httpd-panel">
-    <div class="httpd-panel-title">
+  <TooltipProvider v-if="entry" :delay-duration="120">
+    <div class="httpd-panel">
+      <div class="httpd-panel-title">
       <span class="httpd-eyebrow text-muted-foreground">请求记录</span>
       <span class="httpd-pill" :class="sCls(entry.status)">{{ entry.status ?? 'ERR' }}</span>
       <span class="font-mono text-muted-foreground">{{ new Date(entry.ts).toLocaleString() }}</span>
@@ -103,5 +105,6 @@ const viewOpts = [
       <ResponseTable v-if="canList && entry.raw" :rows="listRows()" :columns="columns" :page-size="Number.MAX_SAFE_INTEGER" :list-path="effParse.listPath" @pick="pickList" />
       <p v-else class="p-3 font-mono text-xs text-muted-foreground">{{ entry.error ?? '该响应未匹配到列表，请先在 JSON 视图里把鼠标移到某个数组上点「⇘ 设为列表」，或到「解析」页配置列表路径' }}</p>
     </div>
-  </div>
+    </div>
+  </TooltipProvider>
 </template>
