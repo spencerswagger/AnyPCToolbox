@@ -44,6 +44,11 @@ const router = createRouter({
       name: 'units',
       component: () => import('@/views/Units.vue'),
     },
+    {
+      path: '/http-client',
+      name: 'http-client',
+      component: () => import('@/views/HttpClient.vue'),
+    },
   ],
 })
 
