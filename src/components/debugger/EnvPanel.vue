@@ -60,26 +60,33 @@ function doCopy() {
 </script>
 
 <template>
-  <div class="space-y-4 p-4">
-    <section class="rounded-lg border border-border p-3">
-      <div class="mb-2 text-xs uppercase tracking-wider text-muted-foreground">全局变量（模板里用 {{ literalVar }} 引用）</div>
-      <div v-for="(it, i) in items" :key="i" class="mb-1.5 flex items-center gap-1.5">
-        <input class="w-28 rounded-md border border-border bg-background px-2 py-1 font-mono text-sm" :value="it.name" placeholder="name"
-          @input="setRow(i, { name: ($event.target as HTMLInputElement).value })" />
-        <input class="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm" :value="it.value" placeholder="value"
-          @input="setRow(i, { value: ($event.target as HTMLInputElement).value })" />
-        <button class="text-muted-foreground hover:text-destructive" @click="remove(i)">✕</button>
+  <div class="space-y-4">
+    <section class="httpd-panel">
+      <div class="httpd-panel-title">
+        <span class="httpd-eyebrow text-muted-foreground">global variables</span>
+        <span class="text-xs text-muted-foreground">（{{ literalVar }}）</span>
       </div>
-      <button class="text-sm text-primary hover:underline" @click="add">+ 添加变量</button>
+      <div class="p-3">
+        <div v-for="(it, i) in items" :key="i" class="mb-1.5 flex items-center gap-1.5">
+          <input class="w-28 rounded border border-border bg-background px-2 py-1.5 font-mono text-xs" :value="it.name" placeholder="name"
+            @input="setRow(i, { name: ($event.target as HTMLInputElement).value })" />
+          <input class="flex-1 rounded border border-border bg-background px-2 py-1.5 font-mono text-xs" :value="it.value" placeholder="value"
+            @input="setRow(i, { value: ($event.target as HTMLInputElement).value })" />
+          <button class="rounded border border-border bg-background p-1.5 text-muted-foreground hover:bg-accent hover:text-destructive" @click="remove(i)">✕</button>
+        </div>
+        <button class="httpd-btn rounded border border-border px-2 py-0.5 text-xs text-primary hover:bg-accent" @click="add">+ add var</button>
+      </div>
     </section>
-    <section class="rounded-lg border border-border p-3">
-      <div class="mb-2 text-xs uppercase tracking-wider text-muted-foreground">导入 / 导出</div>
-      <div class="flex gap-2">
-        <button class="rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent" @click="doExport">导出当前接口</button>
-        <label class="cursor-pointer rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent">
-          导入接口<input type="file" accept="application/json" class="hidden" @change="onImport" />
+    <section class="httpd-panel">
+      <div class="httpd-panel-title">
+        <span class="httpd-eyebrow text-muted-foreground">import / export</span>
+      </div>
+      <div class="flex gap-2 p-3">
+        <button class="httpd-btn rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90" @click="doExport">export</button>
+        <label class="httpd-btn cursor-pointer rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent">
+          import<input type="file" accept="application/json" class="hidden" @change="onImport" />
         </label>
-        <button class="rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent" @click="doCopy">复制为 JSON</button>
+        <button class="httpd-btn rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent" @click="doCopy">copy json</button>
       </div>
     </section>
   </div>

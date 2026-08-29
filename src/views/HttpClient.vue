@@ -85,43 +85,78 @@ function removeApi(id: string) {
 function fmtTime(ts: number | undefined): string {
   return ts ? new Date(ts).toLocaleString() : ''
 }
+
+// 方法 -> 工业配色类
+function mCls(m?: string): string {
+  const key = (m ?? '').toLowerCase()
+  const map: Record<string, string> = {
+    get: 'httpd-m-get', post: 'httpd-m-post', put: 'httpd-m-put',
+    patch: 'httpd-m-patch', delete: 'httpd-m-delete',
+    head: 'httpd-m-head', options: 'httpd-m-options',
+  }
+  return map[key] ?? 'httpd-m-options'
+}
+const tabs = [
+  { key: 'config', label: 'config' },
+  { key: 'run', label: 'run · viz' },
+  { key: 'history', label: 'history' },
+] as const
 </script>
 
 <template>
-  <div class="flex h-full flex-col">
+  <div class="httpd flex h-full flex-col bg-background">
+    <!-- 工业头部 -->
+    <header class="flex h-9 shrink-0 items-center gap-3 border-b border-border bg-card px-3">
+      <span class="httpd-eyebrow flex items-center gap-2 text-muted-foreground">
+        <span class="inline-block h-2 w-2 rounded-full bg-primary" />
+        http · debugger
+      </span>
+      <span v-if="currentApi" class="httpd-chip ml-1" :class="mCls(currentApi.method)">{{ currentApi.method }}</span>
+      <span class="min-w-0 truncate font-medium text-foreground">{{ currentApi?.name ?? '—' }}</span>
+      <span v-if="currentApi" class="truncate font-mono text-xs text-muted-foreground">{{ currentApi.urlTemplate }}</span>
+    </header>
+
     <div class="flex min-h-0 flex-1">
-      <aside v-if="!collapsed" class="w-60 shrink-0 overflow-y-auto border-r border-border bg-card p-3">
-        <div class="mb-2 flex items-center justify-between">
-          <span class="flex items-center gap-1">
-            <button class="text-muted-foreground hover:text-accent-foreground" title="折叠接口列表" @click="collapsed = true">◂</button>
-            <span class="text-xs uppercase tracking-wider text-muted-foreground">接口列表</span>
+      <aside v-if="!collapsed" class="w-60 shrink-0 overflow-y-auto border-r border-border bg-card">
+        <div class="flex items-center justify-between border-b border-border px-2 py-2">
+          <span class="flex items-center gap-1.5 px-1">
+            <button class="text-xs text-muted-foreground hover:text-accent-foreground" title="折叠接口列表" @click="collapsed = true">‹</button>
+            <span class="httpd-eyebrow text-muted-foreground">endpoints</span>
           </span>
-          <button class="text-sm text-primary hover:underline" @click="createApi">+ 新建</button>
+          <button class="httpd-btn rounded border border-border px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground" @click="createApi">+ new</button>
         </div>
-        <ul class="space-y-1">
+        <ul class="space-y-0.5 p-1.5">
           <li v-for="a in Object.values(apis)" :key="a.id" class="group flex items-center gap-1">
             <input v-if="renamingId === a.id"
               v-model="renameText"
-              class="w-full rounded-md border border-border bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="w-full rounded border border-border bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               autofocus @keydown.enter="commitRename" @blur="commitRename" @focus="($event.target as HTMLInputElement).select()" />
             <template v-else>
-              <button class="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+              <button class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
                 :class="a.id === currentId ? 'bg-accent text-accent-foreground' : ''"
-                @click="select(a.id)" @dblclick="startRename(a.id)" :title="a.name">{{ a.name }}</button>
+                :style="a.id === currentId ? { boxShadow: 'inset 2px 0 0 hsl(var(--primary))' } : {}"
+                @click="select(a.id)" @dblclick="startRename(a.id)" :title="a.name">
+                <span class="w-12 shrink-0 font-mono font-semibold" :class="mCls(a.method)">{{ a.method }}</span>
+                <span class="min-w-0 truncate">{{ a.name }}</span>
+              </button>
               <button class="shrink-0 text-muted-foreground opacity-0 hover:text-accent-foreground group-hover:opacity-100" title="重命名" @click="startRename(a.id)">✎</button>
               <button class="shrink-0 text-muted-foreground opacity-0 hover:text-destructive group-hover:opacity-100" title="删除" @click="removeApi(a.id)">✕</button>
             </template>
           </li>
         </ul>
       </aside>
-      <button v-else class="w-9 shrink-0 border-r border-border bg-card text-center text-muted-foreground hover:text-accent-foreground" title="展开接口列表" @click="collapsed = false">▸</button>
+      <button v-else class="flex w-9 shrink-0 flex-col items-center justify-center gap-1 border-r border-border bg-card text-muted-foreground hover:text-accent-foreground" title="展开接口列表" @click="collapsed = false">
+        <span class="font-mono text-lg leading-none">›</span>
+        <span class="httpd-eyebrow" style="writing-mode: vertical-rl">endpoints</span>
+      </button>
+
       <main class="min-w-0 flex-1 overflow-auto p-4">
         <div class="mb-4 flex items-center gap-1 border-b border-border">
-          <button v-for="t in (['config','run','history'] as const)" :key="t" class="px-3 py-2 text-sm"
-            :class="activeTab === t ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'"
-            @click="activeTab = t">{{ { config: '配置', run: '运行·可视化', history: '历史' }[t] }}</button>
-          <button class="ml-auto rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            :class="showEnv ? 'text-accent-foreground' : ''" @click="showEnv = !showEnv">⚙ 环境管理</button>
+          <button v-for="t in tabs" :key="t.key" class="px-3 py-2 text-xs font-medium tracking-wide"
+            :class="activeTab === t.key ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-accent-foreground'"
+            @click="activeTab = t.key">{{ t.label }}</button>
+          <button class="ml-auto rounded px-3 py-2 text-xs font-medium tracking-wide hover:bg-accent hover:text-accent-foreground"
+            :class="showEnv ? 'text-primary' : 'text-muted-foreground'" @click="showEnv = !showEnv">ENV: globals / import</button>
         </div>
         <EnvPanel v-if="showEnv && currentApi" :globals="globals" :api="currentApi" @globals="setGlobals" @import="onImport" />
         <template v-else-if="currentApi">
@@ -131,10 +166,12 @@ function fmtTime(ts: number | undefined): string {
         </template>
       </main>
     </div>
-    <footer class="flex items-center gap-3 border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground">
-      <span class="font-medium text-foreground">{{ currentApi?.name ?? '—' }}</span>
-      <span>{{ currentApi?.method }} {{ currentApi?.urlTemplate }}</span>
-      <span class="ml-auto">更新时间：{{ fmtTime(currentApi?.updatedAt) || '—' }}</span>
+
+    <footer class="flex items-center gap-3 border-t border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
+      <span v-if="currentApi" class="httpd-chip" :class="mCls(currentApi.method)">{{ currentApi.method }}</span>
+      <span class="min-w-0 truncate font-medium text-foreground">{{ currentApi?.name ?? '—' }}</span>
+      <span class="min-w-0 truncate font-mono">{{ currentApi?.urlTemplate || '—' }}</span>
+      <span class="ml-auto shrink-0">updated:&nbsp;{{ fmtTime(currentApi?.updatedAt) || '—' }}</span>
     </footer>
   </div>
 </template>

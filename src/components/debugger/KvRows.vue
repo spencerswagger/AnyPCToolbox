@@ -27,15 +27,15 @@ function add() {
   <div class="space-y-1.5">
     <div v-for="(r, i) in rows" :key="i" class="flex items-center gap-1.5">
       <input
-        class="w-1/2 rounded-md border-border border bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="w-1/2 rounded border border-border bg-background px-2 py-1.5 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :value="r.key" placeholder="key" @input="set(($event.target as HTMLInputElement).value, r.value, i)"
       />
       <input
-        class="flex-1 rounded-md border-border border bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="flex-1 rounded border border-border bg-background px-2 py-1.5 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :value="r.value" placeholder="value（可 {{var}}）" @input="set(r.key, ($event.target as HTMLInputElement).value, i)"
       />
-      <button class="rounded-md border border-input bg-background p-1 text-muted-foreground hover:bg-accent" @click="remove(i)">✕</button>
+      <button class="rounded border border-border bg-background p-1.5 text-muted-foreground hover:bg-accent hover:text-destructive" @click="remove(i)">✕</button>
     </div>
-    <button class="text-sm text-primary hover:underline" @click="add">+ 添加</button>
+    <button class="httpd-btn rounded border border-border px-2 py-0.5 text-xs text-primary hover:bg-accent" @click="add">+ add</button>
   </div>
 </template>
