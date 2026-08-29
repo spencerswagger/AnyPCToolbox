@@ -93,7 +93,7 @@ interface ColumnDef {
 ```
 
 ### 4.1 左栏：接口列表
-新建 / 重命名 / 删除 / 搜索 / 切换。
+新建 / 重命名 / 删除 / 切换。（搜索为后续增强，V1 不做。）
 
 ### 4.2 「配置」Tab
 - 顶部：Method ▾ + URL 模板输入。
@@ -103,7 +103,7 @@ interface ColumnDef {
 - 只负责“把接口长什么样定下来”，不做发送。
 
 ### 4.3 「运行·可视化」Tab
-- 顶部：变量表单（自动提取 `{{var}}` + `@全局变量`）→ **[发送]**。
+- 顶部：变量表单（自动提取 `{{var}}` + 全局变量同名回退）→ **[发送]**。
 - 响应区两个子视图切换：
   - **原始**：状态码（带色）+ 耗时 + 大小 + body（JSON 自动格式化高亮 / text）。
   - **表格视图**：按 ParseConfig JSONPath 抽 total/page/list → 表格 + 类型渲染，含分页条（读 total/page，重新携带当前变量请求）、空态、路径未命中提示。
@@ -112,12 +112,12 @@ interface ColumnDef {
 当前接口最近 N 次发送记录，可回看。
 
 ### 4.5 环境管理（全局变量）
-独立入口（⚙），维护共享变量（如 baseUrl/token）。配置与运行 Tab 通过 `@name` 引用。
+独立入口（⚙），维护共享变量（如 baseUrl/token）。全局变量通过**同名 `{{name}}` 回退**引用：接口本地变量值未设置（空）时，自动取全局同名变量。
 
 ## 5. 变量提取与请求发送
 
 - **提取**：扫描 `urlTemplate + query[].value + headers[].value + bodyText` 中所有 `{{标识符}}`，去重写入 `variables`（不覆盖已有默认值/描述）。
-- **合并**：模板变量 `{{var}}` 优先，未命中则回退 `@全局变量`。
+- **合并**：模板变量 `{{var}}` 优先，本地空值则回退 `同名全局变量`。
 - **替换**：发送前替换所有占位符；进 query 时 `encodeURIComponent`，进 body 时原样。
 - **发送**：`fetch(fullUrl, { method, headers, body })`，`AbortController` 超时（默认 30s 可配）。
 - **响应**：按 content-type / 试解析 JSON；存原始文本；记录到历史。
