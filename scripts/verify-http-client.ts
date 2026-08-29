@@ -1,6 +1,7 @@
 // HTTP 调试器核心逻辑自检脚本（非单元测试框架）
 // 运行：node scripts/verify-http-client.ts
 import { extractPlaceholders, resolveVars, replaceAll, collectSnippet } from '../src/lib/debugger/variables.ts'
+import { buildRequest } from '../src/lib/debugger/builder.ts'
 
 let failed = 0
 function check(name: string, cond: boolean, detail = ''): void {
@@ -23,6 +24,28 @@ check('全局缺省为空字符串', resolveVars([{ name: 'x', value: '' }], g).
 check('替换 {{id}} → 42', replaceAll('/users/{{id}}', { id: '42' }) === '/users/42')
 check('未命中占位符原样保留', replaceAll('/u/{{nope}}', {}) === '/u/{{nope}}')
 check('collectSnippet 串联各来源', collectSnippet({ urlTemplate: '/{{a}}', query: [{ key: 'k', value: '{{b}}' }], headers: [{ key: 'h', value: '{{c}}' }], bodyText: '{{d}}' }).includes('{{d}}'))
+
+console.log('请求构造')
+const req = buildRequest(
+  {
+    id: '1', protocol: 'http', name: 'g', method: 'GET', urlTemplate: 'https://x.com/u/{{id}}',
+    query: [{ key: 'page', value: '{{page}}' }, { key: 'q', value: 'a b' }],
+    headers: [{ key: 'Auth', value: 'Bearer {{token}}' }],
+    bodyType: 'json', bodyText: '{"id":"{{id}}"}',
+    variables: [], parse: { listPath: '', columns: [] }, updatedAt: 0,
+  },
+  { id: '42', page: '1', token: 'T' },
+)
+check('URL 模板替换 + 追加 query（且 query 值编码空格）', req.url === 'https://x.com/u/42?page=1&q=a%20b', req.url)
+check('Header 值替换', req.headers[0]?.[1] === 'Bearer T')
+check('JSON body 替换', req.body === '{"id":"42"}')
+check('json 类型默认注入 Content-Type', req.headers.some(([k]) => k.toLowerCase() === 'content-type'))
+
+const noBody = buildRequest(
+  { id: '1', protocol: 'http', name: 'g', method: 'POST', urlTemplate: 'https://x.com', query: [], headers: [], bodyType: 'none', bodyText: '', variables: [], parse: { listPath: '', columns: [] }, updatedAt: 0 },
+  {},
+)
+check('bodyType none 不注入 Content-Type', !noBody.headers.some(([k]) => k.toLowerCase() === 'content-type'))
 
 console.log(failed === 0 ? '\n全部通过' : `\n${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)
