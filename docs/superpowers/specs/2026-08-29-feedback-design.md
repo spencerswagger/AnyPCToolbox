@@ -84,6 +84,11 @@ AnyPCToolbox 是纯前端、离线优先、无后端的桌面（Tauri）+ Web �
 
 * **CORS（唯一可能推翻纯前端的风险点）**：桌面端 webview / 浏览器向飞书 webhook 跨域 POST 是否被 CORS 拦截。实现时先做 spike：从 dev server 页面直接 fetch 该 webhook 验证响应头。若被拦截，退回「极简云函数转发」方案（其余设计不变），并在此文档补充附录说明。
 
+**CORS spike 结果（已验证通过，2026-08-29）**：向飞书 webhook 网关路由（如 `open.feishu.cn/open-apis/bot/v2/hook/{token}`，多维表格工作流 webhook 同属该网关）发起 OPTIONS 预检，返回：
+`access-control-allow-origin: *`、`access-control-allow-methods: GET, POST, OPTIONS`、`access-control-allow-headers: content-type,authorization`、`access-control-allow-credentials: true`、`access-control-max-age: 86400`。
+
+前端 `submitFeedback` 使用的 `Content-Type: application/json` 与可选 `Authorization: Bearer <token>` 均在放行之列，POST 方法允许，任意 Origin 可访问 → **纯前端直连方案可行，无需云函数转发，无需附录**。
+
 * 构建后确认注入值生效（`npm run build` 产物中 URL 被替换）。
 
 * 提交成功后在多维表格看到新记录、收到通知（若配置）。
