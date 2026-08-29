@@ -7,8 +7,10 @@ import type { ParseResult } from '@/lib/debugger/parse'
 import { effectivePaging, pagingParams } from '@/lib/debugger/paging'
 import { getHistory, pushHistory, type HistoryEntry } from '@/lib/debugger/db'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { TooltipProvider } from 'radix-vue'
 import ResponseTable from './ResponseTable.vue'
 import ResponseTree from './ResponseTree.vue'
+import FieldTip from './FieldTip.vue'
 
 const props = defineProps<{ api: ApiRequest; globals: Record<string, string> }>()
 const emit = defineEmits<{ (e: 'update', api: ApiRequest): void }>()
@@ -183,13 +185,13 @@ function sCls(status?: number): string {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <TooltipProvider :delay-duration="150"><div class="space-y-4">
     <!-- 请求 / 历史 工具区 -->
     <div class="httpd-panel">
       <div class="httpd-panel-title">
         <span class="httpd-eyebrow text-muted-foreground">请求 / 历史</span>
+        <FieldTip>顶部「发送」会按当前接口实时请求；此下拉可选择一条历史请求，在下方面板查看其响应。选择「最新发送（实时）」回到实时请求模式。</FieldTip>
         <select
-          title="选择一条历史请求，在下方面板查看其响应；选择「最新发送」回到实时请求模式"
           class="ml-1 h-7 max-w-60 rounded border border-border bg-background px-1.5 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :value="historyPick?.ts ?? 0"
           @change="onHistorySel(Number(($event.target as HTMLSelectElement).value))"
@@ -259,5 +261,5 @@ function sCls(status?: number): string {
       </div>
       <ResponseTable v-else-if="parsed && parsed.rows.length" :rows="parsed.rows" :total="parsed.total" :page="page" :page-size="pageSize" :columns="props.api.parse.columns" :loading="running" @go="goToPage" />
     </div>
-  </div>
+  </div></TooltipProvider>
 </template>

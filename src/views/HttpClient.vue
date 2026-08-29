@@ -97,9 +97,9 @@ function mCls(m?: string): string {
   return map[key] ?? 'httpd-m-options'
 }
 const tabs = [
-  { key: 'config', label: '配置 Config' },
-  { key: 'run', label: '运行 Run·Viz' },
-  { key: 'history', label: '历史 History' },
+  { key: 'config', label: '配置' },
+  { key: 'run', label: '运行·可视化' },
+  { key: 'history', label: '历史' },
 ] as const
 </script>
 
