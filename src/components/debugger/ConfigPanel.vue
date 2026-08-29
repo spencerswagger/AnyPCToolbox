@@ -66,9 +66,9 @@ function mCls(m: HttpMethod): string {
           :disabled="!dirty" :title="'把当前接口的请求配置、解析与分页规则保存到本地'" @click="emit('save')"
         >保存</button>
         <button
-          class="shrink-0 rounded border border-primary px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary hover:text-primary-foreground"
+          class="httpd-btn httpd-btn-accent shrink-0 rounded px-2.5 py-1 text-xs"
           :title="'按当前接口发送请求并记录到历史（自动跳到「调试」页查看结果）'" @click="emit('send')"
-        >🚀 发送</button>
+        >发送</button>
       </div>
 
       <div class="httpd-panel overflow-hidden">

@@ -180,12 +180,12 @@ const STATUS_REASON: Record<number, string> = {
           分页：{{ effPaging.mode === 'offset' ? `${effPaging.sizeParam}/${effPaging.offsetParam}` : `${effPaging.pageParam}/${effPaging.sizeParam}` }} · 每页 {{ effPaging.size }} 条
         </span>
         <span class="ml-auto">
-          <button class="rounded border border-border px-3 py-1 text-xs font-semibold text-primary hover:bg-accent disabled:opacity-40" :disabled="running" :title="'按当前接口发送请求并记录到历史；若配置了分页，将携带分页参数'" @click="send">
+          <button class="httpd-btn httpd-btn-accent rounded px-3 py-1 text-xs" :disabled="running" :title="'按当前接口发送请求并记录到历史；若配置了分页，将携带分页参数'" @click="send">
             <span v-if="running">
               <span class="mr-1 inline-block animate-spin" aria-hidden="true">⟳</span>
               发送中 ({{ requestMs }}ms)
             </span>
-            <span v-else>🚀 发送</span>
+            <span v-else>发送</span>
           </button>
         </span>
       </div>
@@ -198,7 +198,7 @@ const STATUS_REASON: Record<number, string> = {
               @input="setVar(i, ($event.target as HTMLInputElement).value)" />
           </label>
         </div>
-        <p v-if="!vars.length" class="text-xs text-muted-foreground">模板中没有 {{ literalVar }} 占位符，可直接点击上方「🚀 发送」。</p>
+        <p v-if="!vars.length" class="text-xs text-muted-foreground">模板中没有 {{ literalVar }} 占位符，可直接点击上方「发送」。</p>
       </div>
     </div>
 
