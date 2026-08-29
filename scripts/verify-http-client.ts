@@ -2,6 +2,7 @@
 // 运行：node scripts/verify-http-client.ts
 import { extractPlaceholders, resolveVars, replaceAll, collectSnippet } from '../src/lib/debugger/variables.ts'
 import { buildRequest } from '../src/lib/debugger/builder.ts'
+import { parseResponse } from '../src/lib/debugger/parse.ts'
 
 let failed = 0
 function check(name: string, cond: boolean, detail = ''): void {
@@ -46,6 +47,20 @@ const noBody = buildRequest(
   {},
 )
 check('bodyType none 不注入 Content-Type', !noBody.headers.some(([k]) => k.toLowerCase() === 'content-type'))
+
+console.log('响应解析')
+const raw = JSON.stringify({ code: 0, data: { list: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }], total: 2, page: 1 } })
+const r = parseResponse(raw, { listPath: '$.data.list', totalPath: '$.data.total', pagePath: '$.data.page', columns: [] })
+check('rows 命中列表', r.rows.length === 2, String(r.rows.length))
+check('total 提取', r.total === 2, String(r.total))
+check('page 提取', r.page === 1, String(r.page))
+check('rows 元素保留原始字段', (r.rows[0] as { id: number }).id === 1)
+const empty = parseResponse(raw, { listPath: '$.missing.path', columns: [] })
+check('路径未命中 → rows 空', empty.rows.length === 0)
+check('路径未命中 → 标记 ok:false', empty.ok === false)
+check('topKeys 提供顶层键', Array.isArray(empty.topKeys) && empty.topKeys.includes('code'))
+const bad = parseResponse('not json', { listPath: '$.list', columns: [] })
+check('非法 JSON → error 提示', bad.ok === false && typeof bad.error === 'string')
 
 console.log(failed === 0 ? '\n全部通过' : `\n${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)
