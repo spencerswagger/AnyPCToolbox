@@ -17,6 +17,11 @@ const emit = defineEmits<{
 
 const globals = computed(() => props.globals)
 const running = ref(false)
+// 请求实时时长（ms）：发送期间每 100ms 刷新一次
+const requestMs = ref(0)
+let durationTimer: ReturnType<typeof setInterval> | null = null
+// 「自动解析」完成后强制 HistoryPanel 切到「列表」视图
+const forcedView = ref<'console' | 'json' | 'list' | null>(null)
 // 发送成功后用该响应同步页码；响应展示统一走「所选历史」picked
 const parsed = ref<ParseResult | null>(null)
 const err = ref('')
@@ -29,7 +34,7 @@ const effPaging = computed(() => effectivePaging(props.api))
 
 // 模块/组件作用域的当前 AbortController：卸载时中止未完成的 fetch
 let aborter: AbortController | null = null
-onUnmounted(() => aborter?.abort())
+onUnmounted(() => { aborter?.abort(); if (durationTimer) clearInterval(durationTimer) })
 
 // 外部「发送」信号（来自「请求」页 URL 右侧）：信号递增即触发一次发送
 const lastSendTick = ref(props.sendTick ?? 0)
@@ -71,10 +76,13 @@ function pagingOverrides(): Record<string, string> {
 
 async function send() {
   running.value = true
+  const t0 = performance.now()
+  requestMs.value = 0
+  if (durationTimer) clearInterval(durationTimer)
+  durationTimer = setInterval(() => { requestMs.value = Math.round(performance.now() - t0) }, 100)
   err.value = ''
   parsed.value = null
   const log: string[] = []
-  const t0 = performance.now()
   let timer: ReturnType<typeof setTimeout> | undefined
   const overrides = pagingOverrides()
   const built = buildRequest(props.api, { ...effResolved(), ...overrides }, overrides)
@@ -122,6 +130,7 @@ async function send() {
     err.value = '发送失败：' + msg
   } finally {
     running.value = false
+    if (durationTimer) { clearInterval(durationTimer); durationTimer = null }
   }
 }
 
@@ -145,6 +154,8 @@ function autoParse() {
     parse: { ...props.api.parse, listPath: inf.parse.listPath!, totalPath: inf.parse.totalPath, pagePath: inf.parse.pagePath, columns: inf.parse.columns },
     paging: { ...props.api.paging, ...inf.paging, enabled: true },
   })
+  // 解析完成后跳到「列表」视图，直接查看解析出的表格
+  forcedView.value = 'list'
 }
 
 // 当前选中历史的解析结果，供分页器与总数展示
@@ -170,7 +181,11 @@ const STATUS_REASON: Record<number, string> = {
         </span>
         <span class="ml-auto">
           <button class="rounded border border-border px-3 py-1 text-xs font-semibold text-primary hover:bg-accent disabled:opacity-40" :disabled="running" :title="'按当前接口发送请求并记录到历史；若配置了分页，将携带分页参数'" @click="send">
-            {{ running ? '发送中…' : '🚀 发送' }}
+            <span v-if="running">
+              <span class="mr-1 inline-block animate-spin" aria-hidden="true">⟳</span>
+              发送中 ({{ requestMs }}ms)
+            </span>
+            <span v-else>🚀 发送</span>
           </button>
         </span>
       </div>
@@ -205,7 +220,7 @@ const STATUS_REASON: Record<number, string> = {
         <span v-if="displayParsed.total !== undefined" class="ml-auto font-mono text-muted-foreground">共 {{ displayParsed.total }} 条</span>
       </div>
 
-      <HistoryPanel :entry="picked" :parse="props.api.parse" :columns="props.api.parse.columns" default-view="list">
+      <HistoryPanel :entry="picked" :parse="props.api.parse" :columns="props.api.parse.columns" default-view="list" :active-view="forcedView">
         <template #actions>
           <button
             class="ml-2 shrink-0 rounded border border-border px-2 py-0.5 text-xs font-semibold text-primary hover:bg-accent"

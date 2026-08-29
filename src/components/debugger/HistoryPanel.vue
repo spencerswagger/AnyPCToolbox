@@ -13,7 +13,9 @@ const props = withDefaults(defineProps<{
   columns: ColumnDef[]
   // 默认激活的标签：'list' 表示“能解析成列表就切到列表，否则切到 JSON”（供「调试」页使用）
   defaultView?: 'console' | 'json' | 'list'
-}>(), { defaultView: 'console' })
+  // 外部主动切换视图（供「自动解析」完成后跳到「列表」），值为 null 表示不强制
+  activeView?: 'console' | 'json' | 'list' | null
+}>(), { defaultView: 'console', activeView: null })
 
 type ViewName = 'console' | 'json' | 'list'
 
@@ -67,6 +69,8 @@ function initialView(): ViewName {
 const view = ref<ViewName>(initialView())
 // 换了一条历史（发送产生新记录 / 点了别的时间点）→ 回到默认标签
 watch(() => props.entry?.ts, () => { view.value = initialView() })
+// 外部主动切到某视图（如「自动解析」完成 → 列表）；值为 null 时忽略
+watch(() => props.activeView, (v) => { if (v) view.value = v })
 
 const viewOpts = [
   { k: 'console' as const, label: '控制台', title: '完整的请求 / 响应收发过程日志' },
