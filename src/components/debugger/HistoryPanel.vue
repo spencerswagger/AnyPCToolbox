@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { HistoryEntry } from '@/lib/debugger/db'
 import type { ColumnDef, ParseConfig } from '@/lib/debugger/model'
-import { ref } from 'vue'
-import ResponseView from './ResponseView.vue'
+import { parseResponse } from '@/lib/debugger/parse'
+import { computed, ref } from 'vue'
+import ResponseTable from './ResponseTable.vue'
 
-defineProps<{ entry: HistoryEntry | null; parse: ParseConfig; columns: ColumnDef[] }>()
-const view = ref<'console' | 'response'>('console')
+const props = defineProps<{ entry: HistoryEntry | null; parse: ParseConfig; columns: ColumnDef[] }>()
+const view = ref<'console' | 'json' | 'list'>('console')
 
 type Line = { t: string; c: string }
 // 将 console 文本拆为带行级配色的行（模仿 curl 的 * / > / < 语义）
@@ -22,6 +23,23 @@ function sCls(status?: number): string {
   if (!status || status < 100 || status >= 600) return 'httpd-ser'
   return `httpd-s${Math.floor(status / 100)}`
 }
+
+// 响应体是否能解析为列表 → 「列表」标签可用
+const canList = computed(() => {
+  if (!props.entry?.raw) return false
+  return parseResponse(props.entry.raw, props.parse).rows.length > 0
+})
+// JSON 视图：优先漂亮打印，否则原样文本
+const jsonText = computed(() => {
+  const raw = props.entry?.raw ?? ''
+  try { return JSON.stringify(JSON.parse(raw), null, 2) } catch { return raw }
+})
+
+const viewOpts = [
+  { k: 'console' as const, label: '控制台', title: '完整的请求 / 响应收发过程日志' },
+  { k: 'json' as const, label: 'JSON', title: '响应体的原始 JSON 或文本' },
+  { k: 'list' as const, label: '列表', title: '按解析规则渲染为列表表格（需已配置并匹配到列表）' },
+]
 </script>
 
 <template>
@@ -31,16 +49,25 @@ function sCls(status?: number): string {
       <span class="httpd-pill" :class="sCls(entry.status)">{{ entry.status ?? 'ERR' }}</span>
       <span class="font-mono text-muted-foreground">{{ new Date(entry.ts).toLocaleString() }}</span>
       <span class="ml-auto flex gap-1">
-        <button class="rounded px-2 py-0.5 text-xs font-medium" :class="view === 'console' ? 'bg-accent' : 'hover:bg-accent'" @click="view='console'" title="查看该请求完整的发送过程日志（请求行、请求头、响应行、耗时等）">控制台</button>
-        <button class="rounded px-2 py-0.5 text-xs font-medium" :class="view === 'response' ? 'bg-accent' : 'hover:bg-accent'" @click="view='response'" title="查看该请求的响应（列表自动表格，其余按树状或原文展示）">响应</button>
+        <button
+          v-for="o in viewOpts" :key="o.k"
+          class="rounded px-2 py-0.5 text-xs font-medium"
+          :class="view === o.k ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent'"
+          :disabled="o.k === 'list' && !canList"
+          :title="o.title + (o.k === 'list' && !canList ? '（未匹配到列表，不可用）' : '')"
+          @click="view = o.k"
+        >{{ o.label }}</button>
       </span>
     </div>
     <div v-if="view === 'console'" class="httpd-console max-h-[50vh] overflow-auto p-3">
       <span v-for="(ln, i) in consoleLines(entry.console)" :key="i" :class="ln.c" class="block whitespace-pre">{{ ln.t }}</span>
     </div>
+    <div v-else-if="view === 'json'" class="httpd-console max-h-[50vh] overflow-auto p-3">
+      <pre class="whitespace-pre-wrap font-mono text-xs text-foreground">{{ jsonText }}</pre>
+    </div>
     <div v-else class="httpd-console max-h-[50vh] overflow-auto">
-      <ResponseView v-if="entry.raw" :raw="entry.raw" :parse="parse" :columns="columns" max-height-class="min-h-0" />
-      <pre v-else class="p-3 font-mono text-xs text-muted-foreground whitespace-pre-wrap">{{ entry.error ?? '（无响应体）' }}</pre>
+      <ResponseTable v-if="canList && entry.raw" :rows="parseResponse(entry.raw, parse).rows" :columns="columns" :page-size="Number.MAX_SAFE_INTEGER" />
+      <p v-else class="p-3 font-mono text-xs text-muted-foreground">{{ entry.error ?? '该响应未匹配到列表，请先到「解析」页配置列表路径或点「✧ 自动推断」' }}</p>
     </div>
   </div>
 </template>

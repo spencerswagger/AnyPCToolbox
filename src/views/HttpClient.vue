@@ -3,6 +3,7 @@ import { createApiRequest } from '@/lib/debugger/model'
 import type { ApiRequest } from '@/lib/debugger/model'
 import { getApis, saveApis, getGlobals, saveGlobals, getHistory, type HistoryEntry } from '@/lib/debugger/db'
 import ConfigPanel from '@/components/debugger/ConfigPanel.vue'
+import ParsePanel from '@/components/debugger/ParsePanel.vue'
 import RunPanel from '@/components/debugger/RunPanel.vue'
 import HistoryPanel from '@/components/debugger/HistoryPanel.vue'
 import EnvPanel from '@/components/debugger/EnvPanel.vue'
@@ -10,7 +11,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 const apis = ref<Record<string, ApiRequest>>({})
 const currentId = ref<string>('')
-const activeTab = ref<'config' | 'run'>('config')
+const activeTab = ref<'request' | 'parse' | 'run'>('request')
 const globals = ref<Record<string, string>>({})
 const showEnv = ref(false)
 const renamingId = ref('')
@@ -109,10 +110,12 @@ function removeApi(id: string) {
   void saveApis(apis.value)
 }
 
-// ---- 历史：选中后在「运行」页查看控制台 / 响应，也供「解析」页推断 ----
+// ---- 历史：选中后即在下方面板查看 控制台 / JSON / 列表（不自动切换到「调试」页）----
 function pickHistory(e: HistoryEntry) {
   pickedHistory.value = e
-  activeTab.value = 'run'
+}
+function clearPicked() {
+  pickedHistory.value = null
 }
 function onSent() { void loadHistory() }
 function goRun() { activeTab.value = 'run' }
@@ -137,8 +140,9 @@ function mCls(m?: string): string {
   return map[key] ?? 'httpd-m-options'
 }
 const tabs = [
-  { key: 'config', label: '配置' },
-  { key: 'run', label: '运行·可视化' },
+  { key: 'request', label: '请求' },
+  { key: 'parse', label: '解析' },
+  { key: 'run', label: '调试' },
 ] as const
 </script>
 
@@ -153,12 +157,6 @@ const tabs = [
       <span v-if="currentApi" class="httpd-chip ml-1" :class="mCls(currentApi.method)">{{ currentApi.method }}</span>
       <span class="min-w-0 truncate font-medium text-foreground">{{ currentApi?.name ?? '—' }}</span>
       <span v-if="currentApi" class="truncate font-mono text-xs text-muted-foreground">{{ currentApi.urlTemplate }}</span>
-      <span v-if="dirty" class="ml-auto shrink-0 font-mono text-[10px] text-warning">● 未保存</span>
-      <button
-        v-if="currentApi"
-        class="ml-auto shrink-0 rounded border border-border px-3 py-1 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-40"
-        :disabled="!dirty" :title="'保存当前接口的配置与解析规则到本地（含分页配置）'" @click="persistCurrent"
-      >保存</button>
     </header>
 
     <div class="flex min-h-0 flex-1">
@@ -224,15 +222,27 @@ const tabs = [
             :class="showEnv ? 'text-primary' : 'text-muted-foreground'" @click="showEnv = !showEnv">环境变量 / 导入</button>
         </div>
 
+        <!-- 显式保存：仅在有未保存修改时出现，置于内容顶部，醒目可见 -->
+        <div v-if="dirty && currentApi && !showEnv" class="mb-4 flex flex-wrap items-center gap-3 rounded border border-warning bg-warning/10 px-3 py-2">
+          <span class="text-sm font-bold text-warning">● 有未保存的修改</span>
+          <span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">当前接口的配置与解析规则尚未写入本地，请及时保存。</span>
+          <button class="rounded bg-warning px-4 py-1.5 text-sm font-bold text-background hover:opacity-90" :title="'把当前接口的请求配置、解析与分页规则保存到本地'" @click="persistCurrent">保存</button>
+        </div>
+
         <EnvPanel v-if="showEnv && currentApi" :globals="globals" :api="currentApi" @globals="setGlobals" @import="onImport" />
         <template v-else-if="currentApi">
-          <ConfigPanel v-if="activeTab === 'config'" :api="currentApi" :history="history" :picked="pickedHistory" @update="update" @go-run="goRun" />
-          <template v-else>
-            <RunPanel :api="currentApi" :globals="globals" @update="update" @sent="onSent" />
-            <div v-if="pickedHistory" class="mt-4">
-              <HistoryPanel :entry="pickedHistory" :parse="currentApi.parse" :columns="currentApi.parse.columns" />
+          <ConfigPanel v-if="activeTab === 'request'" :api="currentApi" @update="update" />
+          <ParsePanel v-else-if="activeTab === 'parse'" :api="currentApi" :history="history" :picked="pickedHistory" @update="update" @go-run="goRun" />
+          <RunPanel v-else :api="currentApi" :globals="globals" @update="update" @sent="onSent" />
+
+          <!-- 历史详情：选中历史后始终展示（含 控制台 / JSON / 列表 切换），不跳转「调试」页 -->
+          <div v-if="pickedHistory" class="mt-4">
+            <div class="mb-2 flex items-center gap-2">
+              <span class="httpd-eyebrow text-muted-foreground">历史详情</span>
+              <button class="ml-auto text-xs text-muted-foreground hover:text-accent-foreground" title="取消选中该历史记录" @click="clearPicked">✕ 取消选择</button>
             </div>
-          </template>
+            <HistoryPanel :entry="pickedHistory" :parse="currentApi.parse" :columns="currentApi.parse.columns" />
+          </div>
         </template>
       </main>
     </div>
