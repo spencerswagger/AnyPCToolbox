@@ -4,6 +4,7 @@
  * 同时校验 tag 与 package.json / src-tauri/tauri.conf.json 版本一致，不一致直接失败。
  *
  * 用法：node scripts/generate-update-artifacts.js v1.0.1
+ *      （也支持预发布后缀，如 v0.0.7-rc1）
  * 输出：dist-version/version.json（含 version / buildTime / notes）
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
@@ -13,8 +14,8 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tag = process.argv[2] ?? process.env.GITHUB_REF_NAME ?? ''
 
-if (!/^v\d+\.\d+\.\d+$/.test(tag)) {
-  console.error(`[generate-update-artifacts] 无效 tag: "${tag}"（期望形如 v1.2.3）`)
+if (!/^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(tag)) {
+  console.error(`[generate-update-artifacts] 无效 tag: "${tag}"（期望形如 v1.2.3 或 v1.2.3-rc1）`)
   process.exit(1)
 }
 const version = tag.replace(/^v/, '')

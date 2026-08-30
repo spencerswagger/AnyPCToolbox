@@ -20,6 +20,9 @@ jobs:
           draft: true
 
   # 2. 六平台桌面构建 + Updater 签名
+  # Windows 打包器不支持预发布版本号（如 0.0.7-rc1 的 -rc1 后缀），
+  # 因此预发布标签跳过 Windows 的构建上传步骤（条件置于 step 级，
+  # job 级 if 无法使用 matrix 上下文）。
   publish-tauri:
     needs: create-draft-release
     strategy:
@@ -29,21 +32,27 @@ jobs:
           - platform: macos-latest
             target: aarch64-apple-darwin
             args: '--target aarch64-apple-darwin'
+            allowPrerelease: true
           - platform: macos-latest
             target: x86_64-apple-darwin
             args: '--target x86_64-apple-darwin'
+            allowPrerelease: true
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             args: '--target x86_64-pc-windows-msvc'
+            allowPrerelease: false
           - platform: windows-latest
             target: aarch64-pc-windows-msvc
             args: '--target aarch64-pc-windows-msvc'
+            allowPrerelease: false
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             args: '--target x86_64-unknown-linux-gnu'
+            allowPrerelease: true
           - platform: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             args: '--target aarch64-unknown-linux-gnu'
+            allowPrerelease: true
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -118,11 +127,14 @@ jobs:
           '
 
       - name: Build and upload Tauri app
+        if: ${{ matrix.allowPrerelease || !contains(github.ref_name, '-') }}
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_FEEDBACK_WEBHOOK_URL: ${{ vars.FEEDBACK_WEBHOOK_URL }}
+          VITE_FEEDBACK_WEBHOOK_TOKEN: ${{ vars.FEEDBACK_WEBHOOK_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: ${{ github.ref_name }}
@@ -147,6 +159,9 @@ jobs:
 
       - name: Build web
         run: npm run build
+        env:
+          VITE_FEEDBACK_WEBHOOK_URL: ${{ vars.FEEDBACK_WEBHOOK_URL }}
+          VITE_FEEDBACK_WEBHOOK_TOKEN: ${{ vars.FEEDBACK_WEBHOOK_TOKEN }}
 
       - name: Generate version.json into web dist
         run: |

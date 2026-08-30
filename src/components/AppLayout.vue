@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { MessageSquarePlus } from 'lucide-vue-next'
 import ThemeToggle from './ThemeToggle.vue'
 import UpdateBanner from './UpdateBanner.vue'
 import UpdateManager from './UpdateManager.vue'
+import FeedbackDialog from '@/components/FeedbackDialog.vue'
 
 const router = useRouter()
 const showBackTop = ref(false)
+const showFeedback = ref(false)
 
 const SCROLL_THRESHOLD = 300
 
@@ -39,8 +42,18 @@ onUnmounted(() => {
           <span class="hidden sm:inline-block">AnyPCToolbox</span>
         </button>
         <div class="flex items-center gap-2">
+          <button
+            class="inline-flex h-9 w-9 items-center justify-center rounded-md text-sm font-medium transition-colors
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                   hover:bg-accent hover:text-accent-foreground"
+            title="意见反馈"
+            @click="showFeedback = true"
+          >
+            <MessageSquarePlus class="h-5 w-5" />
+          </button>
           <ThemeToggle />
         </div>
+        <FeedbackDialog v-model:open="showFeedback" />
       </div>
     </header>
     <UpdateBanner />
