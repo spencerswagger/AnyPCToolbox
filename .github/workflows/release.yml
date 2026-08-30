@@ -45,6 +45,9 @@ jobs:
             target: aarch64-unknown-linux-gnu
             args: '--target aarch64-unknown-linux-gnu'
     runs-on: ${{ matrix.platform }}
+    # 非正式版本(预发布 tag，如 v0.0.7-rc1，含 '-' 后缀)不构建 Windows：
+    # Windows MSI 目标无法打包非数字预发布版本号，仅正式版(v0.0.6 这类无连字符 tag)才构建
+    if: ${{ matrix.platform != 'windows-latest' || !contains(github.ref_name, '-') }}
     steps:
       - uses: actions/checkout@v4
 
