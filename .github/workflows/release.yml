@@ -20,8 +20,11 @@ jobs:
           draft: true
 
   # 2. 六平台桌面构建 + Updater 签名
+  # Windows 打包器不支持预发布版本号（如 0.0.7-rc1 的 -rc1 后缀），
+  # 因此预发布标签只构建 mac/linux，Windows 两个目标整体跳过。
   publish-tauri:
     needs: create-draft-release
+    if: ${{ matrix.allowPrerelease || !contains(github.ref_name, '-') }}
     strategy:
       fail-fast: false
       matrix:
@@ -29,21 +32,27 @@ jobs:
           - platform: macos-latest
             target: aarch64-apple-darwin
             args: '--target aarch64-apple-darwin'
+            allowPrerelease: true
           - platform: macos-latest
             target: x86_64-apple-darwin
             args: '--target x86_64-apple-darwin'
+            allowPrerelease: true
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             args: '--target x86_64-pc-windows-msvc'
+            allowPrerelease: false
           - platform: windows-latest
             target: aarch64-pc-windows-msvc
             args: '--target aarch64-pc-windows-msvc'
+            allowPrerelease: false
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             args: '--target x86_64-unknown-linux-gnu'
+            allowPrerelease: true
           - platform: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             args: '--target aarch64-unknown-linux-gnu'
+            allowPrerelease: true
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
