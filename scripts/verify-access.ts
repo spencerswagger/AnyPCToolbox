@@ -7,6 +7,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { mergeAccessConfig, type AccessConfig } from '../src/lib/access/config.ts'
+import { sha256Hex, verifyPasscode } from '../src/lib/access/verify.ts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const generatedFile = resolve(root, 'src/generated/access-config.ts')
@@ -50,6 +51,13 @@ async function main() {
     check('override 非 enabled → 回落 build', mergeAccessConfig(build, { ...override, enabled: false }) === build)
     check('override 盐格式非法 → 回落 build', mergeAccessConfig(build, { ...override, salt: 'zz' }) === build)
     check('override 哈希格式非法 → 回落 build', mergeAccessConfig(build, { ...override, hash: 'yy' }) === build)
+
+    console.log('密码验证')
+    const enabled: AccessConfig = { version: 1, enabled: true, salt, hash }
+    check('sha256Hex 已知向量', (await sha256Hex('abc')) === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+    check('正确密码 → true', await verifyPasscode('test-pass-123', enabled))
+    check('错误密码 → false', !(await verifyPasscode('wrong-pass', enabled)))
+    check('disabled 配置 → 恒 false', !(await verifyPasscode('test-pass-123', { ...enabled, enabled: false })))
   } finally {
     if (snapshot !== null) {
       writeFileSync(generatedFile, snapshot)
