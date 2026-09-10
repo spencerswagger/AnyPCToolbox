@@ -13,9 +13,13 @@ function loadEnvLocal() {
     const raw = readFileSync(resolve(root, '.env.local'), 'utf8')
     const vars = {}
     for (const line of raw.split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/)
+      const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/)
       if (!m) continue
-      let value = m[2].trim()
+      let value = m[2]
+      if (!value.startsWith('"') && !value.startsWith("'")) {
+        value = value.replace(/\s*#.*$/, '')
+      }
+      value = value.trim()
       if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
         value = value.slice(1, -1)
       }

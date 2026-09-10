@@ -2,7 +2,7 @@
 // 运行：node scripts/verify-access.ts
 import { execSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,18 +25,27 @@ function runGenerator(accessCode: string): string {
 }
 
 async function main() {
-  console.log('生成脚本')
-  const content = runGenerator('test-pass-123')
-  const salt = content.match(/salt: '([0-9a-f]{32})'/)?.[1] ?? ''
-  const hash = content.match(/hash: '([0-9a-f]{64})'/)?.[1] ?? ''
-  check('配置了 ACCESS_CODE → enabled: true', content.includes('enabled: true'))
-  check('盐为 32 位 hex', salt !== '')
-  const expected = createHash('sha256').update(salt + 'test-pass-123').digest('hex')
-  check('hash = SHA-256(salt + 明文)', hash === expected, `${hash} vs ${expected}`)
-  check('产物不含明文密码', !content.includes('test-pass-123'))
+  const snapshot = existsSync(generatedFile) ? readFileSync(generatedFile, 'utf8') : null
+  try {
+    console.log('生成脚本')
+    const content = runGenerator('test-pass-123')
+    const salt = content.match(/salt: '([0-9a-f]{32})'/)?.[1] ?? ''
+    const hash = content.match(/hash: '([0-9a-f]{64})'/)?.[1] ?? ''
+    check('配置了 ACCESS_CODE → enabled: true', content.includes('enabled: true'))
+    check('盐为 32 位 hex', salt !== '')
+    const expected = createHash('sha256').update(salt + 'test-pass-123').digest('hex')
+    check('hash = SHA-256(salt + 明文)', hash === expected, `${hash} vs ${expected}`)
+    check('产物不含明文密码', !content.includes('test-pass-123'))
 
-  const empty = runGenerator('')
-  check('ACCESS_CODE 为空 → enabled: false', empty.includes('enabled: false'))
+    const empty = runGenerator('')
+    check('ACCESS_CODE 为空 → enabled: false', empty.includes('enabled: false'))
+  } finally {
+    if (snapshot !== null) {
+      writeFileSync(generatedFile, snapshot)
+    } else if (existsSync(generatedFile)) {
+      unlinkSync(generatedFile)
+    }
+  }
 
   if (failed > 0) {
     console.error(`\n${failed} 项检查失败`)
