@@ -4,9 +4,15 @@ import { useRouter } from 'vue-router'
 import ThemeToggle from './ThemeToggle.vue'
 import UpdateBanner from './UpdateBanner.vue'
 import UpdateManager from './UpdateManager.vue'
+import AccessDialog from './access/AccessDialog.vue'
+import { useAccess } from '@/lib/access/useAccess.ts'
 
 const router = useRouter()
 const showBackTop = ref(false)
+const { hasHiddenTools } = useAccess()
+const accessOpen = ref(false)
+
+let clickTimes: number[] = []
 
 const SCROLL_THRESHOLD = 300
 
@@ -18,12 +24,43 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function openAccess() {
+  if (!hasHiddenTools) return
+  accessOpen.value = true
+}
+
+function handleLogoClick() {
+  router.push('/')
+  if (!hasHiddenTools) return
+  const now = Date.now()
+  if (clickTimes.length > 0 && now - clickTimes[clickTimes.length - 1] > 1500) {
+    clickTimes = []
+  }
+  clickTimes.push(now)
+  while (clickTimes.length > 0 && now - clickTimes[0] > 5000) {
+    clickTimes.shift()
+  }
+  if (clickTimes.length >= 7) {
+    clickTimes = []
+    openAccess()
+  }
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    openAccess()
+  }
+}
+
 onMounted(() => {
   window.addEventListener('scroll', handleScroll, { passive: true })
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -33,7 +70,7 @@ onUnmounted(() => {
       <div class="flex h-14 items-center justify-between px-4 md:px-6">
         <button
           class="flex items-center gap-2 font-semibold"
-          @click="router.push('/')"
+          @click="handleLogoClick"
         >
           <span class="inline-flex items-center justify-center rounded-lg bg-primary p-1.5 text-primary-foreground text-sm">🧰</span>
           <span class="hidden sm:inline-block">AnyPCToolbox</span>
@@ -62,6 +99,7 @@ onUnmounted(() => {
       </button>
     </Transition>
     <UpdateManager />
+    <AccessDialog v-model:open="accessOpen" />
   </div>
 </template>
 
