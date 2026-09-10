@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/generate-access-config.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/generate-access-config.mjs",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri"

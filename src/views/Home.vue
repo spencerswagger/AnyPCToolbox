@@ -1,7 +1,18 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import ToolCard from '@/components/ToolCard.vue'
+import { useAccess } from '@/lib/access/useAccess.ts'
 
-const tools = [
+interface ToolMeta {
+  icon: string
+  name: string
+  description: string
+  route: string
+  tag?: string
+  hidden?: boolean
+}
+
+const tools: ToolMeta[] = [
   {
     icon: '📝',
     name: 'Markdown 编辑器',
@@ -59,6 +70,9 @@ const tools = [
     tag: 'v1.0',
   },
 ]
+
+const { canSee } = useAccess()
+const visibleTools = computed(() => tools.filter(t => canSee(t.hidden)))
 </script>
 
 <template>
@@ -69,7 +83,7 @@ const tools = [
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <ToolCard
-        v-for="tool in tools"
+        v-for="tool in visibleTools"
         :key="tool.route"
         v-bind="tool"
       />
