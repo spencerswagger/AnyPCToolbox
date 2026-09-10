@@ -40,9 +40,6 @@ async function main() {
     check('hash = SHA-256(salt + 明文)', hash === expected, `${hash} vs ${expected}`)
     check('产物不含明文密码', !content.includes('test-pass-123'))
 
-    const empty = runGenerator('')
-    check('ACCESS_CODE 为空 → enabled: false', empty.includes('enabled: false'))
-
     console.log('配置解析')
     const build: AccessConfig = { version: 1, enabled: true, salt: 'a'.repeat(32), hash: 'b'.repeat(64) }
     const override = { version: 1, enabled: true, salt: 'c'.repeat(32), hash: 'd'.repeat(64) }
@@ -58,6 +55,43 @@ async function main() {
     check('正确密码 → true', await verifyPasscode('test-pass-123', enabled))
     check('错误密码 → false', !(await verifyPasscode('wrong-pass', enabled)))
     check('disabled 配置 → 恒 false', !(await verifyPasscode('test-pass-123', { ...enabled, enabled: false })))
+
+    console.log('会话状态')
+    const fingerprint = hash.slice(0, 8)
+    const storageMap = new Map<string, string>()
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: {
+        getItem: (k: string) => storageMap.get(k) ?? null,
+        setItem: (k: string, v: string) => { storageMap.set(k, v) },
+        removeItem: (k: string) => { storageMap.delete(k) },
+      },
+      configurable: true,
+    })
+    const globalOverride = globalThis as { __ACCESS_CODE_CONFIG__?: unknown }
+    globalOverride.__ACCESS_CODE_CONFIG__ = { version: 1, enabled: true, salt, hash }
+    const { parseStoredSession, useAccess } = await import('../src/lib/access/useAccess.ts')
+
+    check('parseStoredSession: null → false', parseStoredSession(null, fingerprint) === false)
+    check('parseStoredSession: 非法 JSON → false', parseStoredSession('{bad', fingerprint) === false)
+    check('parseStoredSession: 指纹失配 → false', parseStoredSession(JSON.stringify({ unlocked: true, fingerprint: 'ffffffff', unlockedAt: 0 }), fingerprint) === false)
+    check('parseStoredSession: 匹配 → true', parseStoredSession(JSON.stringify({ unlocked: true, fingerprint, unlockedAt: 0 }), fingerprint) === true)
+
+    const access = useAccess()
+    check('初始未解锁', access.unlocked.value === false)
+    check('canSee 公开工具', access.canSee() === true && access.canSee(false) === true)
+    check('canSee 隐藏工具（未解锁）→ false', access.canSee(true) === false)
+    check('hasHiddenTools 为 true', access.hasHiddenTools === true)
+    check('错误密码 unlock → false', !(await access.unlock('wrong-pass')))
+    check('正确密码 unlock → true', await access.unlock('test-pass-123'))
+    check('解锁后 canSee 隐藏工具 → true', access.canSee(true) === true)
+    check('会话已持久化', (storageMap.get('anypctoolbox.access') ?? '').includes(fingerprint))
+    access.lock()
+    check('锁定后未解锁', access.unlocked.value === false)
+    check('锁定后 canSee 隐藏工具 → false', access.canSee(true) === false)
+    check('锁定后会话已清除', storageMap.get('anypctoolbox.access') === undefined)
+
+    const empty = runGenerator('')
+    check('ACCESS_CODE 为空 → enabled: false', empty.includes('enabled: false'))
   } finally {
     if (snapshot !== null) {
       writeFileSync(generatedFile, snapshot)
