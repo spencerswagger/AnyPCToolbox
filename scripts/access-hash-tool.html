@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>访问密钥哈希生成器</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #1f2937; }
+    input { width: 100%; padding: 8px; margin: 8px 0; box-sizing: border-box; }
+    button { padding: 8px 16px; cursor: pointer; }
+    pre { background: #f3f4f6; padding: 12px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; }
+    .ok { color: #16a34a; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <h1>访问密钥哈希生成器</h1>
+  <p>输入密码生成一行配置，整行替换 web 构建包内 <code>access-config.js</code> 的对应内容，重新部署即可生效。</p>
+  <label>密码：<input id="passcode" type="text" autocomplete="off" /></label>
+  <div>
+    <button id="generate">生成配置</button>
+    <button id="copy" disabled>复制</button>
+    <span id="hint" class="ok"></span>
+  </div>
+  <pre id="output">（点击"生成配置"后显示）</pre>
+  <script>
+    const input = document.getElementById('passcode')
+    const output = document.getElementById('output')
+    const copyBtn = document.getElementById('copy')
+    const hint = document.getElementById('hint')
+    let current = ''
+
+    async function sha256Hex(text) {
+      const data = new TextEncoder().encode(text)
+      const digest = await crypto.subtle.digest('SHA-256', data)
+      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+    }
+
+    document.getElementById('generate').addEventListener('click', async () => {
+      hint.textContent = ''
+      const passcode = input.value
+      if (!passcode) { output.textContent = '请先输入密码'; copyBtn.disabled = true; return }
+      const bytes = crypto.getRandomValues(new Uint8Array(16))
+      const salt = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+      const hash = await sha256Hex(salt + passcode)
+      current = `window.__ACCESS_CODE_CONFIG__ = { version: 1, enabled: true, salt: "${salt}", hash: "${hash}" }`
+      output.textContent = current
+      copyBtn.disabled = false
+    })
+
+    copyBtn.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(current)
+      hint.textContent = '已复制'
+      setTimeout(() => { hint.textContent = '' }, 2000)
+    })
+  </script>
+</body>
+</html>
