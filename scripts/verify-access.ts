@@ -6,6 +6,8 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { mergeAccessConfig, type AccessConfig } from '../src/lib/access/config.ts'
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const generatedFile = resolve(root, 'src/generated/access-config.ts')
 
@@ -39,6 +41,15 @@ async function main() {
 
     const empty = runGenerator('')
     check('ACCESS_CODE 为空 → enabled: false', empty.includes('enabled: false'))
+
+    console.log('配置解析')
+    const build: AccessConfig = { version: 1, enabled: true, salt: 'a'.repeat(32), hash: 'b'.repeat(64) }
+    const override = { version: 1, enabled: true, salt: 'c'.repeat(32), hash: 'd'.repeat(64) }
+    check('override 合法 → 采用 override', mergeAccessConfig(build, override).hash === 'd'.repeat(64))
+    check('override null → 回落 build', mergeAccessConfig(build, null) === build)
+    check('override 非 enabled → 回落 build', mergeAccessConfig(build, { ...override, enabled: false }) === build)
+    check('override 盐格式非法 → 回落 build', mergeAccessConfig(build, { ...override, salt: 'zz' }) === build)
+    check('override 哈希格式非法 → 回落 build', mergeAccessConfig(build, { ...override, hash: 'yy' }) === build)
   } finally {
     if (snapshot !== null) {
       writeFileSync(generatedFile, snapshot)
